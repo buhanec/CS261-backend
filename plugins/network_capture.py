@@ -14,7 +14,7 @@ class NetworkCapture(Plugin, InputPlugin):
         super(NetworkCapture, self).__init__()
         self.source = source
         self.buffer_size = buffer_size
-        print('[NetworkCaptureT] init')
+        print('[NetworkCapture] init')
 
     def fetch(self, storage):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -1,5 +1,4 @@
 from system2 import TheSystem
-from system2.plugins import Plugins
 import time
 
 if __name__ == '__main__':
@@ -8,14 +7,16 @@ if __name__ == '__main__':
     system = TheSystem()
     system.find_plugins(["plugins"])
 
-    print "Plugins:", [p.name for p in Plugins._plugins]
-    print "Input:", [p.name for p in Plugins._input]
-    print "Storage:", [p.name for p in Plugins._storage]
+    print "Plugins:", [p.name for p in system.plugins]
+    print "Input:", [p.name for p in system.input_plugins]
+    print "Storage:", [p.name for p in system.storage_plugins]
 
-    tcap = Plugins._input[1](("cs261.dcs.warwick.ac.uk", 80))
-    stor = Plugins._storage[1]()
-    tid = tcap.start(stor)
-    tid2 = tcap.start(stor)
-    time.sleep(1)
-    tcap.stop(tid)
-    tcap.stop(tid2)
+    trades = ("cs261.dcs.warwick.ac.uk", 80)
+    network = system.input_plugins[1]
+    printer = system.storage_plugins[1]
+
+    in_ = system.load_plugin(None, None, network, (trades,))
+    out = system.load_plugin(None, None, printer)
+    tid = system.connect_plugins(in_, out)
+    time.sleep(3)
+    system.disconnect_plugins(tid)
