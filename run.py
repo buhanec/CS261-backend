@@ -1,7 +1,12 @@
+import sys
+import cdecimal
 from system2 import TheSystem
 import time
 
 if __name__ == '__main__':
+    # performance stuff for older python < 3
+    sys.modules["decimal"] = cdecimal
+
     # this just servers for testing right now, actual system is todo
     # we can still implement plugin functionality & define interfaces
     system = TheSystem()
