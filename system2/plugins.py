@@ -1,4 +1,6 @@
 import threading
+from Queue import Queue
+from multiprocessing import cpu_count
 
 
 class Plugins(type):
@@ -53,41 +55,39 @@ class Plugin(Base):
     __metaclass__ = Plugins
 
     # constants
-    STATUS_INIT = -1
+    STATUS_BASE_INIT = -2
+    STATUS_MIXIN_INIT = -1
     STATUS_LOADED = 0
     STATUS_INUSE = 1
     STATUS_ERROR = 2
+    STATUS_STOPPED = 3
 
     # Plugin 'info'
     _name = None
-    _burst = True
     _type = []
 
     def __init__(self):
         super(Plugin, self).__init__()
-        self.status = Plugin.STATUS_INIT
-        self.terminate = False
+        self.status = Plugin.STATUS_BASE_INIT
+        print('[Plugin] init')
 
     @property
     def status(self):
-        """ Status of the plugin """
         return self._status
+
+    @status.setter
+    def status(self, value):
+        if value >= Plugin.STATUS_BASE_INIT and value <= Plugin.STATUS_STOPPED:
+            self._status = value
+        else:
+            raise Exception('Bad status')
 
     @status.setter
     def status(self, value):
         self._status = value  # TODO: check status
 
-    @property
-    def terminate(self):
-        """ Flag to start terminating plugin """
-        return self._terminating
-
-    @terminate.setter
-    def terminate(self, value):
-        self._terminating = value  # TODO: check flag
-
     def unload(self):
-        """ Stops the plugin operation """
+        """ Stops the plugin operation and cleans up """
 
     def reload(self, options):
         """ Restarts the plugin operation """
@@ -99,39 +99,85 @@ class InputPlugin(object):
 
     def __init__(self):
         super(InputPlugin, self).__init__()
+        self._status = Plugin.STATUS_MIXIN_INIT
         self._threads = {}
         print('[InputPlugin] init')
+
+    @property
+    def threads(self):
+        return self._threads
+
+    @threads.setter
+    def threads(self, value):
+        raise Exception("cannot do this")
 
     def start(self, storage):
         thread = threading.Thread(target=self.fetch, args=(storage,))
         thread.start()
         self._threads[thread.ident] = (thread, threading.Event())
-        print("started id", thread.ident)
         return thread.ident
 
     def stop(self, tid):
         self._threads[tid][1].set()
         self._threads[tid][0].join()
-        print("stopped id", tid)
+        del self._threads[tid]
 
-    def fetch(self, callback):
+    def fetch(self, storage, workers):
         pass
+
+    def unload(self):
+        for tid in self.threads.keys():
+            self.stop(tid)
+        print "[InputPlugin] unload"
 
 
 class StoragePlugin(object):
     """ Storage plugin mixin """
     __metaclass__ = Plugins
 
-    def __init__(self):
+    def __init__(self, queue_size=0, workers=cpu_count()):
         super(StoragePlugin, self).__init__()
+        self._status = Plugin.STATUS_MIXIN_INIT
+        self._q = Queue(queue_size)
+        self._threads = []
+        self._terminate = threading.Event()
+        for i in range(workers):
+            t = threading.Thread(target=self.worker)
+            self._threads.append(t)
+            t.start()
+
+    def enqueue(self, data):
+        """ Stores raw data into a queue that will be processed by workers """
+        self._q.put(data)
 
     def store(self, data):
-        pass
+        """ Stores single entry data into storage """
 
     def burst_store(self, data):
+        """ Stores multiple entry data into storage """
         for d in data:
-            print "doing"
             self.store(d)
+            pass
+
+    def worker(self):
+        """ Worker function that gets data from the queue and stores it """
+        while not self._terminate.isSet():
+            data = self._q.get()
+            if data is None:  # flush blocked threads
+                self._q.task_done()
+                break
+            self.burst_store(data)
+            self._q.task_done()
+
+    def unload(self, wait=False):
+        """ Terminate all threads """
+        self._terminate.set()
+        for thread in self._threads:
+            self._q.put(None)
+        self._q.join()
+        for thread in self._threads:
+            thread.join()
+        print "[StoragePlugin] unload"
 
 
 class QueryPlugin(object):
@@ -143,6 +189,7 @@ class QueryPlugin(object):
 
     def __init__(self):
         super(QueryPlugin, self).__init__()
+        self._status = Plugin.STATUS_MIXIN_INIT
 
     def clusturs(self, options):
         pass

@@ -73,10 +73,6 @@ class TheSystem(object):
         return plugin_id
 
     def unload_plugin(self, id_):
-        if id_ in self._plugins:
-            del self._plugins[id_]
-        else:
-            raise Exception("plugin does not exist")
         if id_ in self._input_threads:
             map(self.disconnect_plugins, self._input_threads[id_].keys())
             del self._input_threads[id_]
@@ -85,6 +81,11 @@ class TheSystem(object):
             del self._storage_threads[id_]
         if id_ in self._query_threads:
             del self._query_threads[id_]
+        if id_ in self._plugins:
+            self._plugins[id_][2].unload()
+            del self._plugins[id_]
+        else:
+            raise Exception("plugin does not exist")
 
     def connect_plugins(self, input_, storage):
         tid = self._plugins[input_][2].start(self._plugins[storage][2])

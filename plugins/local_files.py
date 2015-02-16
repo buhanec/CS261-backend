@@ -5,7 +5,7 @@ from multiprocessing import cpu_count
 from threading import Semaphore
 
 
-class FileInput(Plugin, InputPlugin):
+class FileInput(InputPlugin, Plugin):
     """ File input plugin """
 
     _name = 'File Reader'
@@ -18,8 +18,10 @@ class FileInput(Plugin, InputPlugin):
     def fetch(self, storage):
         with open(self.source, "r") as f:
             pool = ThreadPool(cpu_count())
-            if type(storage).burst:
-                fn = lambda cb, data: pool.apply_async(cb, (data,))
+            # if type(storage).burst:
+            if True:
+                def fn(cb, data):
+                    lambda cb, data: pool.apply_async(cb, (data,))
                 callback = storage.burst_store
             else:
                 fn = pool.map_async
@@ -30,11 +32,10 @@ class FileInput(Plugin, InputPlugin):
             pool = None
 
 
-class FileStore(Plugin, StoragePlugin):
+class FileStore(StoragePlugin, Plugin):
     """ File storage plugin """
 
     _name = 'File Writer'
-    _burst = False
 
     def __init__(self, storage):
         super(FileStore, self).__init__()
