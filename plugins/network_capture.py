@@ -21,7 +21,8 @@ class NetworkCapture(Plugin, InputPlugin):
         s.connect(self.source)
         pool = ThreadPool(cpu_count())
         if type(storage).burst:
-            fn = lambda cb, data: pool.apply_async(cb, (data,))
+            def fn(cb, data):
+                return lambda cb, data: pool.apply_async(cb, (data,))
             callback = storage.burst_store
         else:
             fn = pool.map_async

@@ -17,7 +17,7 @@ if __name__ == '__main__':
     print "Storage:", [p.name for p in system.storage_plugins]
 
     trades = ("cs261.dcs.warwick.ac.uk", 80)
-    network = system.input_plugins[1]
+    network = system.input_plugins[0]
     printer = system.storage_plugins[1]
 
     in_ = system.load_plugin(None, None, network, (trades,))
