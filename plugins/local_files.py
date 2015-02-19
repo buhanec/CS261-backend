@@ -13,19 +13,14 @@ class FileInput(InputPlugin, Plugin):
     def __init__(self, source):
         super(FileInput, self).__init__()
         self.source = source
-        print('[FileInput] init')
+        self.logger.info('[FileInput] init')
 
-    def fetch(self, storage):
+    def fetch(self, callback):
         with open(self.source, "r") as f:
             pool = ThreadPool(cpu_count())
-            # if type(storage).burst:
-            if True:
-                def fn(cb, data):
-                    lambda cb, data: pool.apply_async(cb, (data,))
-                callback = storage.burst_store
-            else:
-                fn = pool.map_async
-                callback = storage.store
+
+            def fn(cb, data):
+                lambda cb, data: pool.apply_async(cb, (data,))
             fn(callback, [l.split(",") for l in f.read().splitlines()])
             pool.close()
             pool.join()
@@ -41,12 +36,10 @@ class FileStore(StoragePlugin, Plugin):
         super(FileStore, self).__init__()
         self.storage = storage
         self.semaphore = Semaphore(1)
-        print('[FileStore] init')
+        self.logger.info('[FileStore] init')
 
     def store(self, trade):
         self.semaphore.acquire()
-        self.status = Plugin.STATUS_INUSE
         with open(self.storage, "a") as f:
             f.write(','.join(trade) + os.linesep)
-        self.status = Plugin.STATUS_LOADED
         self.semaphore.release()

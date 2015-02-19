@@ -10,5 +10,5 @@ class PandasStorage(StoragePlugin, Plugin):
 
     def __init__(self):
         super(PandasStorage, self).__init__()
-        self.status = Plugin.STATUS_LOADED
-        print('[PandasStorage] init')
+        self.status = Plugin.STATUS_INIT
+        self.logger.info('[PandasStorage] init')

@@ -61,8 +61,8 @@ class SqlStorage(StoragePlugin, Plugin):
             if not self.engine.dialect.has_table(self.engine.connect(), table):
                 tables[table].create(checkfirst=True)
 
-        self.status = Plugin.STATUS_LOADED
-        print('[SqlStorage] init')
+        self.status = Plugin.STATUS_INIT
+        self.logger.info('[SqlStorage] init')
 
     def worker(self):
         session = self.factory()
@@ -84,4 +84,4 @@ class SqlStorage(StoragePlugin, Plugin):
     def unload(self):
         super(SqlStorage, self).unload()
         self.engine.close()
-        print "[SqlStorage] unload"
+        self.logger.info("[SqlStorage] unload")

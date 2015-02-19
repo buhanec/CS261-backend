@@ -1,4 +1,5 @@
 import imp
+import logger
 import os
 from .plugins import Plugins
 
@@ -7,7 +8,7 @@ class TheSystem(object):
     """ The core class """
 
     def __init__(self):
-        print('[TheSystem] init')
+        logger.logger.info('[TheSystem] init')
         # probably need to change this at some point
         self._plugins = {}
         self._input_threads = {}
@@ -88,7 +89,7 @@ class TheSystem(object):
             raise Exception("plugin does not exist")
 
     def connect_plugins(self, input_, storage):
-        tid = self._plugins[input_][2].start(self._plugins[storage][2])
+        tid = self._plugins[input_][2].start(self._plugins[storage][2].store)[0]
         self._input_threads[input_][tid] = storage
         self._storage_threads[storage][tid] = input_
         self._connections[tid] = (input_, storage)
@@ -96,7 +97,7 @@ class TheSystem(object):
 
     def disconnect_plugins(self, tid):
         input_, storage = self._connections[tid]
-        self._plugins[input_][2].stop(tid)
+        self._plugins[input_][2].stop_thread(tid)
         del self._connections[tid]
         del self._storage_threads[storage][tid]
         del self._input_threads[input_][tid]

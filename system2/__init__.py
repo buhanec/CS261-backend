@@ -13,4 +13,5 @@ All exceptions are defined in the thesystem.exceptions
 @licence: ...
 """
 
+import logging
 from .core import TheSystem
