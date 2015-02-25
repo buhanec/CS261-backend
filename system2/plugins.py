@@ -9,23 +9,17 @@ logger = logging.getLogger('demosystem')
 class Plugins(type):
     """ Plugin metaclass to keep track of plugins """
 
-    _plugins = []
-    _input = []
-    _storage = []
-    _query = []
+    _plugins = {}
 
     def __init__(cls, name, bases, attrs):
         if name not in ['Plugin', 'InputPlugin', 'StoragePlugin',
                         'QueryPlugin']:
-            Plugins._plugins.append(cls)
+            Plugins._plugins[cls._name] = cls
             if issubclass(cls, InputPlugin):
-                Plugins._input.append(cls)
                 cls._type.append('input')
             if issubclass(cls, QueryPlugin):
-                Plugins._query.append(cls)
                 cls._type.append('query')
             if issubclass(cls, StoragePlugin):
-                Plugins._storage.append(cls)
                 cls._type.append('storage')
             logger.info('Plugin class %s found', cls._name)
 
