@@ -6,7 +6,7 @@ from time import sleep
 class PrintStorage(StoragePlugin, Plugin):
     """ Test """
 
-    _name = 'Printing Storage'
+    _name = 'Printer'
 
     def __init__(self, buffer_size=1024):
         super(PrintStorage, self).__init__()

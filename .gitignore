@@ -2,6 +2,8 @@
 trades.csv
 trades_out.csv
 alen/
+error.log
+debug.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

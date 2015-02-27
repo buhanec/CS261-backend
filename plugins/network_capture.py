@@ -8,7 +8,7 @@ import threading
 class NetworkCapture(InputPlugin, Plugin):
     """ Network stream input """
 
-    _name = 'Network Capture'
+    _name = 'NetCap'
 
     def __init__(self, source, buffer_size=1024):
         super(NetworkCapture, self).__init__()

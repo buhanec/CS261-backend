@@ -52,6 +52,7 @@ class Plugin(Base):
     STATUS_MIXIN = -1
     STATUS_INIT = 0
     STATUS_INUSE = 1
+    STATUS_COMPLETED = 2
 
     # Plugin 'info'
     _name = None
@@ -69,7 +70,7 @@ class Plugin(Base):
 
     @status.setter
     def status(self, value):
-        if value >= Plugin.STATUS_BASE and value <= Plugin.STATUS_INUSE:
+        if value >= Plugin.STATUS_BASE and value <= Plugin.STATUS_COMPLETED:
             self._status = value
         else:
             logger.error('Bad status')
@@ -105,6 +106,7 @@ class InputPlugin(object):
         raise Exception("cannot do this")
 
     def start(self, callbacks):
+        """ Creates a producer thread for every callback """
         if type(callbacks) is not list:
             callbacks = [callbacks]
         tids = []
@@ -118,6 +120,7 @@ class InputPlugin(object):
         return tids
 
     def stop_thread(self, tid):
+        """ Stops a specific producer thread """
         self._sem.acquire()
         self._threads[tid][1].set()
         self._threads[tid][0].join()
@@ -125,6 +128,7 @@ class InputPlugin(object):
         self._sem.release()
 
     def stop(self, tids):
+        """ Stops all producer threads """
         for tid in tids:
             self.stop_thread(tid)
 
@@ -132,11 +136,13 @@ class InputPlugin(object):
         """ Performs data collection """
 
     def unload(self):
+        """ Unloads the plugin and performs any cleaning up """
         for tid in self.threads.keys():
             self.stop(tid)
         logger.info("[InputPlugin] unloaded")
 
     def reload(self):
+        """ Reloads the plugin """
         callbacks = self.callbacks
         self.stop(self.threads.keys())
         self.start(callbacks)
@@ -185,7 +191,7 @@ class StoragePlugin(object):
         self._terminate.set()
         for thread in self._threads:
             self._q.put(None)
-        self._q.join()
+        # self._q.join() - blocks if terminate is set and kills thread
         for thread in self._threads:
             thread.join()
         logger.info("[StoragePlugin] unloaded")
@@ -202,14 +208,23 @@ class QueryPlugin(object):
         super(QueryPlugin, self).__init__()
         self._status = Plugin.STATUS_MIXIN
 
-    def clusturs(self, options):
+    def trades(self, query, number):
         pass
 
-    def trader_trades(self, trader, options):
+    def comms(self, query, number):
         pass
 
-    def trader_comms(self, trader, options):
+    def alerts(self, query, number):
         pass
 
-    def stock_trades(self, stock, options):
+    def stock(self, symbol):
+        pass
+
+    def trader(self, email):
+        pass
+
+    def alert(self, alertid):
+        pass
+
+    def plot_data(self, column1, column1_min, column1_max, column2):
         pass

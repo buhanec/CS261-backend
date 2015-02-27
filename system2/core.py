@@ -2,6 +2,7 @@ import logger
 import os
 import imp
 from .plugins import Plugins
+from .exceptions import *
 
 
 class TheSystem(object):
@@ -17,13 +18,14 @@ class TheSystem(object):
             'storage': {},
             'query': {}
         }
+        self._interface = None
         self._connections = {}
         self._plugin_id = 0
         self.find_plugins(["plugins"])
 
     @property
     def plugins(self):
-        return self._available
+        return self._available.keys()
 
     @property
     def loaded_plugins(self):
@@ -41,6 +43,26 @@ class TheSystem(object):
     def loaded_query_plugins(self):
         return {k: self._plugins[k][0] for k in self._threads['query']}
 
+    @property
+    def connections(self):
+        return self._connections
+
+    @property
+    def interface_id(self):
+        return self._interface
+
+    @property
+    def interface(self):
+        if self._interface is None:
+            raise NoInterfaceSetException()
+        return self._plugins[self._interface][2]
+
+    @interface.setter
+    def interface(self, id_):
+        if id not in self._threads['query']:
+            raise NoInterfaceException(id_)
+        self._interface = id_
+
     def find_plugins(self, dirs):
         for attr in Plugins.__dict__:
             if Plugins.__dict__[attr] is list:
@@ -55,17 +77,24 @@ class TheSystem(object):
                     imp.load_module(name, file_, path, descr)
 
     def load_plugin(self, name, desc, plugin, args=()):
+        if type(args) is not list or type(args) is not tuple:
+            args = (args)
+        #print name, desc, plugin, args
         plugin_id = self._plugin_id
+        # unloader = lambda: self.unload_plugin(plugin_id)
         self._plugin_id += 1
         plugin = self._available[plugin]
-        instance = plugin(*args)
+        instance = plugin(*(args,))
         self._plugins[plugin_id] = (name, desc, instance)
+        #print self._plugins
         if 'input' in plugin.type:
             self._threads['input'][plugin_id] = {}
         if 'storage' in plugin.type:
             self._threads['storage'][plugin_id] = {}
         if 'query' in plugin.type:
             self._threads['query'][plugin_id] = {}
+            if self._interface is None:
+                self._interface = plugin_id
         return plugin_id
 
     def unload_plugin(self, id_):
@@ -77,6 +106,8 @@ class TheSystem(object):
             del self._threads['storage'][id_]
         if id_ in self._threads['query']:
             del self._threads['query'][id_]
+            if self._interface == id_:
+                self._interface = None
         if id_ in self._plugins:
             self._plugins[id_][2].unload()
             del self._plugins[id_]
@@ -84,7 +115,8 @@ class TheSystem(object):
             raise Exception("plugin does not exist")
 
     def connect_plugins(self, input_, storage):
-        tid = self._plugins[input_][2].start(self._plugins[storage][2].burst_store)[0]
+        callback = self._plugins[storage][2].burst_store
+        tid = self._plugins[input_][2].start(callback)[0]
         self._threads['input'][input_][tid] = storage
         self._threads['storage'][storage][tid] = input_
         self._connections[tid] = (input_, storage)
@@ -96,6 +128,3 @@ class TheSystem(object):
         del self._connections[tid]
         del self._threads['storage'][storage][tid]
         del self._threads['input'][input_][tid]
-
-    def select_interface(self, query):
-        pass

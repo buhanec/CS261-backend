@@ -8,7 +8,7 @@ from threading import Semaphore
 class FileInput(InputPlugin, Plugin):
     """ File input plugin """
 
-    _name = 'File Reader'
+    _name = 'FileReader'
 
     def __init__(self, source):
         super(FileInput, self).__init__()
@@ -30,7 +30,7 @@ class FileInput(InputPlugin, Plugin):
 class FileStore(StoragePlugin, Plugin):
     """ File storage plugin """
 
-    _name = 'File Writer'
+    _name = 'FileWriter'
 
     def __init__(self, storage):
         super(FileStore, self).__init__()

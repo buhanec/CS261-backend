@@ -1,26 +1,32 @@
-from system2.plugins import Plugin, StoragePlugin
+from system2.plugins import Plugin, StoragePlugin, QueryPlugin
 import sqlalchemy as sa
+from sqlalchemy.orm import scoped_session
+from sqlalchemy.orm import sessionmaker
 import sqlalchemy.types as st
 import datetime
+import time
 
 
-class SqlStorage(StoragePlugin, Plugin):
+class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
     """ SQL Alchemy thing """
 
-    _name = 'SQL Storage'
+    _name = 'SQLStore'
 
     def __init__(self, db='mysql+mysqldb://CS261:password@127.0.0.1/CS261'):
         super(SqlStorage, self).__init__()
-
+        print "============"
+        print db
+        print "============"
         self.engine = sa.create_engine(
             db,
             echo=False,
             echo_pool=False,
             encoding='utf-8',
-            pool_recycle=3600,
+            pool_recycle=3600
         )
         self.engine.echo = False
-        self.factory = sa.scoped_session(sa.sessionmaker(bind=self.engine))
+        self.factory = sessionmaker(bind=self.engine)
+        self.Session = scoped_session(self.factory)
         metadata = sa.MetaData(self.engine)
         tables = {
             'traders': sa.Table(
@@ -65,17 +71,20 @@ class SqlStorage(StoragePlugin, Plugin):
         self.logger.info('[SqlStorage] init')
 
     def worker(self):
-        session = self.factory()
+        while not hasattr(self, "Session"):
+            time.sleep(0.1)
+        session = self.Session()
         while not self._terminate.isSet():
+        #while True:
             data = self._q.get()
             if data is None:  # flush blocked threads
                 self._q.task_done()
                 break
-            self.burst_store(data)
+            self.burst_store(data, session)
             self._q.task_done()
-        session.remove()
+        self.Session.remove()
 
-    def burst_store(self, storage):
+    def burst_store(self, data, storage):
         """ Performs queries to insert data """
         # session.query(...)
         # session.add(...)
@@ -83,5 +92,4 @@ class SqlStorage(StoragePlugin, Plugin):
 
     def unload(self):
         super(SqlStorage, self).unload()
-        self.engine.close()
         self.logger.info("[SqlStorage] unload")
