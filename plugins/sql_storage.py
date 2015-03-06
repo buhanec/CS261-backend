@@ -4,7 +4,9 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 import sqlalchemy.types as st
 from datetime import datetime
+from pprint import pformat as pf
 import time
+import copy
 
 
 class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
@@ -35,7 +37,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         sector = st.String(255)
         volume = st.BigInteger()
         day = st.SmallInteger()
-        live = st.Boolean()
+        live = st.SmallInteger()
         firm = st.String(30)
         currency = st.Enum(('GBX'))
         percent = st.Numeric(3, 2)
@@ -43,7 +45,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         perf = st.Numeric(3, 2)
         num_dev = st.Numeric(2, 2)
         trade_id = st.BigInteger()
-        group_id = st.BigInteger()
+        comm_id = st.BigInteger()
         # All the tables
         self.tables = {
             'live_trade': t(
@@ -59,7 +61,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 c('bid', price, nullable=False),
                 c('ask', price, nullable=False),
                 c('day', day, nullable=False, default=0),
-                c('live', live, nullable=False, default=True),
+                c('live', live, nullable=False, default=0),
                 c('trade_id', trade_id, nullable=False, primary_key=True,
                   autoincrement=True),
                 c('buyer_firm', firm),
@@ -69,13 +71,14 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 'live_comms', metadata,
                 c('time', date, nullable=False),
                 c('sender', email, nullable=False),
-                c('group', group_id, nullable=False),
+                c('comm_id', comm_id, nullable=False, primary_key=True,
+                  autoincrement=True),
                 c('day', day, nullable=False, default=0),
                 c('live', live, nullable=False, default=True)
             ),
             'recipients': t(
                 'recipients', metadata,
-                c('group', group_id, nullable=False),
+                c('comm_id', comm_id, nullable=False),
                 c('recipient', email, nullable=False)
             ),
             'averages_trade': t(
@@ -160,22 +163,30 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
     def store_trades(self, data, session):
         """ Stores trades """
         session.begin()
+        backup = copy.copy(data)
         try:
             ins = self.tables['live_trade'].insert()
-            ins.execute({
-                'time': datetime.strptime(data[0], '%Y-%m-%d %H:%M:%S.%f'),
-                'buyer': data[1],
-                'seller': data[2],
-                'price': data[3],
-                'size': data[4],
-                'currency': data[5],
-                'symbol': data[6],
-                'sector': data[7],
-                'bid': data[8],
-                'ask': data[9],
-                'buyer_firm': data[1].rsplit('@', 1)[1],
-                'seller_firm': data[2].rsplit('@', 1)[1]
-            })
+            try:
+                ins.execute(*[{
+                    'time': datetime.strptime(d[0], '%Y-%m-%d %H:%M:%S.%f'),
+                    'buyer': d[1],
+                    'seller': d[2],
+                    'price': d[3],
+                    'size': d[4],
+                    'currency': d[5],
+                    'symbol': d[6],
+                    'sector': d[7],
+                    'bid': d[8],
+                    'ask': d[9],
+                    'buyer_firm': d[1].rsplit('@', 1)[1],
+                    'seller_firm': d[2].rsplit('@', 1)[1]
+                } for d in data])
+            except ValueError:
+                self.logger.warn('[SqlStorage] ValueError: %s', pf(data))
+            except IndexError:
+                self.logger.warn('[SqlStorage] IndexError: %s %s',
+                                 pf(data),
+                                 pf(backup))
             session.commit()
         except:
             session.rollback()
@@ -185,41 +196,40 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         """ Stores comms """
         session.begin()
         try:
-            gid = session.query(
-                sa.sql.func.max(self.tables['recipients'].c.group)
-            )
-            res = gid.one()
-            try:
-                newid = res[0] + 1
-            except TypeError:
-                newid = 0
-            gins = self.tables['recipients'].insert()
-            gins.execute(*[
-                {'group': newid, 'recipient': r} for r in data[2].split(';')
-            ])
-            ins = self.tables['live_comms'].insert()
-            ins.execute({
-                'time': datetime.strptime(data[0], '%Y-%m-%d %H:%M:%S.%f'),
-                'sender': data[1],
-                'group': newid
-            })
+            backup = copy.copy(data)
+
+            g_ins = self.tables['recipients'].insert()
+            c_ins = self.tables['live_comms'].insert()
+            for d in data:
+                try:
+                    res = c_ins.execute({
+                        'time': datetime.strptime(d[0],
+                                                  '%Y-%m-%d %H:%M:%S.%f'),
+                        'sender': d[1],
+                    })
+                    id_ = res.inserted_primary_key
+                    g_ins.execute(*[
+                        {'comm_id': id_, 'recipient': r}
+                        for r in d[2].split(';')
+                    ])
+                except ValueError:
+                    self.logger.warn('[SqlStorage] ValueError: %s', pf(data))
+                except IndexError:
+                    self.logger.warn('[SqlStorage] IndexError: %s %s',
+                                     pf(data),
+                                     pf(backup))
             session.commit()
         except:
             session.rollback()
             raise
 
-
-    def store(self, data, session):
-        """ Stores single entry data into storage """
-        if len(data) == 3:
-            self.store_comms(data, session)
-        elif len(data) == 10:
-            self.store_trades(data, session)
-
     def burst_store(self, data, session):
         """ Stores multiple entry data into storage """
-        for d in data:
-            self.store(d, session)
+        if len(data) > 0:
+            if len(data[0]) == 3:
+                self.store_comms(data, session)
+            elif len(data[0]) == 10:
+                self.store_trades(data, session)
 
     def worker(self):
         while not hasattr(self, "Session"):
@@ -233,6 +243,12 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             self.burst_store(data, session)
             self._q.task_done()
         self.Session.remove()
+
+    def worker_minute(self):
+        pass
+
+    def worker_day(self):
+        pass
 
     def unload(self):
         super(SqlStorage, self).unload()

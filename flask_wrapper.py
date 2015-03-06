@@ -187,11 +187,11 @@ if __name__ == '__main__':
     sql_id = system.load_plugin('SQL', None, 'SQLStore', db)
     # Connect plugins
     system.connect_plugins(trades_id, sql_id)
-    # system.connect_plugins(trades_id, printer_id)
+    system.connect_plugins(trades_id, printer_id)
     system.connect_plugins(comms_id, sql_id)
-    # system.connect_plugins(comms_id, printer_id)
+    system.connect_plugins(comms_id, printer_id)
     # Wait for a bit
-    time.sleep(5)
+    time.sleep(120)
     # Unload plugins
     system.unload_plugin(trades_id)
     system.unload_plugin(comms_id)
