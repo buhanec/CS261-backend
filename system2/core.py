@@ -54,13 +54,13 @@ class TheSystem(object):
     @property
     def interface(self):
         if self._interface is None:
-            raise NoInterfaceSetException()
+            raise NoInterfaceSet()
         return self._plugins[self._interface][2]
 
     @interface.setter
     def interface(self, id_):
         if id not in self._threads['query']:
-            raise NoInterfaceException(id_)
+            raise NoInterface(id_)
         self._interface = id_
 
     def find_plugins(self, dirs):
@@ -79,14 +79,17 @@ class TheSystem(object):
     def load_plugin(self, name, desc, plugin, args=()):
         if type(args) is not list or type(args) is not tuple:
             args = (args)
-        #print name, desc, plugin, args
         plugin_id = self._plugin_id
-        # unloader = lambda: self.unload_plugin(plugin_id)
         self._plugin_id += 1
-        plugin = self._available[plugin]
-        instance = plugin(*(args,))
+        try:
+            plugin = self._available[plugin]
+        except KeyError:
+            raise MissingPlugin(plugin)
+        try:
+            instance = plugin(*(args,))
+        except:
+            raise PluginInitError(plugin)
         self._plugins[plugin_id] = (name, desc, instance)
-        #print self._plugins
         if 'input' in plugin.type:
             self._threads['input'][plugin_id] = {}
         if 'storage' in plugin.type:

@@ -14,9 +14,6 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
 
     def __init__(self, db='mysql+mysqldb://CS261:password@127.0.0.1/CS261'):
         super(SqlStorage, self).__init__()
-        print "============"
-        print db
-        print "============"
         self.engine = sa.create_engine(
             db,
             echo=False,
@@ -75,7 +72,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             time.sleep(0.1)
         session = self.Session()
         while not self._terminate.isSet():
-        #while True:
+        # while true # - should we let it clean up?
             data = self._q.get()
             if data is None:  # flush blocked threads
                 self._q.task_done()

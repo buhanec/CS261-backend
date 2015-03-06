@@ -226,5 +226,5 @@ class QueryPlugin(object):
     def alert(self, alertid):
         pass
 
-    def plot_data(self, column1, column1_min, column1_max, column2):
+    def plot_data(self, column1, column2):
         pass

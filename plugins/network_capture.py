@@ -19,14 +19,14 @@ class NetworkCapture(InputPlugin, Plugin):
 
     def fetch(self, callback, workers=cpu_count()):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(self.source)
         pool = ThreadPool(workers)
+        s.connect(self.source)
         raw = s.recv(self.buffer_size).splitlines()
         pool.apply_async(callback, ([l.split(",") for l in raw[1:]],))
         while not self._threads[threading.current_thread().ident][1].isSet():
             raw = s.recv(self.buffer_size).splitlines()
             pool.apply_async(callback, ([l.split(",") for l in raw],))
+        s.close()
         pool.close()
         pool.join()
         pool = None
-        s.close()
