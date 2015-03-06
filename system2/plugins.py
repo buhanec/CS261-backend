@@ -21,7 +21,7 @@ class Plugins(type):
                 cls._type.append('query')
             if issubclass(cls, StoragePlugin):
                 cls._type.append('storage')
-            logger.info('Plugin class %s found', cls._name)
+            logger.info('[Plugins] Plugin class %s found', cls._name)
 
     @property
     def name(cls):

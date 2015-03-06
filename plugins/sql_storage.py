@@ -3,7 +3,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 import sqlalchemy.types as st
-import datetime
+from datetime import datetime
 import time
 
 
@@ -22,7 +22,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             pool_recycle=3600
         )
         self.engine.echo = False
-        self.factory = sessionmaker(bind=self.engine)
+        self.factory = sessionmaker(bind=self.engine, autocommit=True)
         self.Session = scoped_session(self.factory)
         metadata = sa.MetaData(self.engine)
         c = sa.Column
@@ -35,13 +35,14 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         sector = st.String(255)
         volume = st.BigInteger()
         day = st.SmallInteger()
+        live = st.Boolean()
         firm = st.String(30)
         currency = st.Enum(('GBX'))
         percent = st.Numeric(3, 2)
         spread = st.Numeric(3, 2)
         perf = st.Numeric(3, 2)
-        num_dev = st.Numberic(2, 2)
-        trade_id = st.String(12)
+        num_dev = st.Numeric(2, 2)
+        trade_id = st.BigInteger()
         group_id = st.BigInteger()
         # All the tables
         self.tables = {
@@ -57,8 +58,10 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 c('sector', sector, nullable=False),
                 c('bid', price, nullable=False),
                 c('ask', price, nullable=False),
-                c('day', day, nullable=False),
-                c('trade_id', trade_id, nullable=False, primary_key=True),
+                c('day', day, nullable=False, default=0),
+                c('live', live, nullable=False, default=True),
+                c('trade_id', trade_id, nullable=False, primary_key=True,
+                  autoincrement=True),
                 c('buyer_firm', firm),
                 c('seller_firm', firm)
             ),
@@ -67,31 +70,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 c('time', date, nullable=False),
                 c('sender', email, nullable=False),
                 c('group', group_id, nullable=False),
-                c('day', day, nullable=False)
-            ),
-            'past_trade': t(
-                'past_trade', metadata,
-                c('time', date, nullable=False),
-                c('buyer', email, nullable=False),
-                c('seller', email, nullable=False),
-                c('price', price, nullable=False),
-                c('size', volume, nullable=False),
-                c('currency', currency, nullable=False),
-                c('symbol', symbol, nullable=False),
-                c('sector', sector, nullable=False),
-                c('bid', price, nullable=False),
-                c('ask', price, nullable=False),
-                c('day', day, nullable=False),
-                c('trade_id', trade_id, nullable=False, primary_key=True),
-                c('buyer_firm', firm),
-                c('seller_firm', firm)
-            ),
-            'past_comms': t(
-                'past_comms', metadata,
-                c('time', date, nullable=False),
-                c('sender', email, nullable=False),
-                c('group', group_id, nullable=False),
-                c('day', day, nullable=False)
+                c('day', day, nullable=False, default=0),
+                c('live', live, nullable=False, default=True)
             ),
             'recipients': t(
                 'recipients', metadata,
@@ -172,45 +152,87 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             )
         }
 
-        for table in self.tables:
-            if not self.engine.dialect.has_table(self.engine.connect(), table):
-                self.tables[table].create(checkfirst=True)
+        metadata.create_all(self.engine)
 
         self.status = Plugin.STATUS_INIT
         self.logger.info('[SqlStorage] init')
+
+    def store_trades(self, data, session):
+        """ Stores trades """
+        session.begin()
+        try:
+            ins = self.tables['live_trade'].insert()
+            ins.execute({
+                'time': datetime.strptime(data[0], '%Y-%m-%d %H:%M:%S.%f'),
+                'buyer': data[1],
+                'seller': data[2],
+                'price': data[3],
+                'size': data[4],
+                'currency': data[5],
+                'symbol': data[6],
+                'sector': data[7],
+                'bid': data[8],
+                'ask': data[9],
+                'buyer_firm': data[1].rsplit('@', 1)[1],
+                'seller_firm': data[2].rsplit('@', 1)[1]
+            })
+            session.commit()
+        except:
+            session.rollback()
+            raise
+
+    def store_comms(self, data, session):
+        """ Stores comms """
+        session.begin()
+        try:
+            gid = session.query(
+                sa.sql.func.max(self.tables['recipients'].c.group)
+            )
+            res = gid.one()
+            try:
+                newid = res[0] + 1
+            except TypeError:
+                newid = 0
+            gins = self.tables['recipients'].insert()
+            gins.execute(*[
+                {'group': newid, 'recipient': r} for r in data[2].split(';')
+            ])
+            ins = self.tables['live_comms'].insert()
+            ins.execute({
+                'time': datetime.strptime(data[0], '%Y-%m-%d %H:%M:%S.%f'),
+                'sender': data[1],
+                'group': newid
+            })
+            session.commit()
+        except:
+            session.rollback()
+            raise
+
+
+    def store(self, data, session):
+        """ Stores single entry data into storage """
+        if len(data) == 3:
+            self.store_comms(data, session)
+        elif len(data) == 10:
+            self.store_trades(data, session)
+
+    def burst_store(self, data, session):
+        """ Stores multiple entry data into storage """
+        for d in data:
+            self.store(d, session)
 
     def worker(self):
         while not hasattr(self, "Session"):
             time.sleep(0.1)
         session = self.Session()
-        # while true # - should we let it clean up?
         while not self._terminate.isSet():
             data = self._q.get()
-            if data is None:  # flush blocked threads
+            if data is None:
                 self._q.task_done()
                 break
             self.burst_store(data, session)
             self._q.task_done()
         self.Session.remove()
-
-    def store_trades(self, data):
-        """ Stores trades """
-
-    def store_comms(self, data):
-        """ Stores comms """
-        time = datetime.strptime(data[0], '%Y-%m-%d %H:%M:%S.%f')
-        sender = data[1]
-        sender_firm = data[1].rsplit('@', 1)[0]
-        recipients = [(r, r.rsplit('@', 1)[0]) for r in data[2].split(';')]
-        # SELECT MAX(Id) FROM Customers
-        #
-
-    def store(self, data):
-        """ Performs queries to insert data """
-        if len(data) == 10:
-            self.store_tradse(data)
-        elif len(data) == 3:
-            self.store_comms(data)
 
     def unload(self):
         super(SqlStorage, self).unload()

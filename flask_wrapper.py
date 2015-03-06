@@ -2,8 +2,7 @@ import sys
 import cdecimal
 sys.modules["decimal"] = cdecimal
 from system2 import TheSystem
-
-# import time
+import time
 import traceback
 from flask import request, url_for
 from flask.ext.api import FlaskAPI, status, exceptions
@@ -176,18 +175,31 @@ def f22(column1, column2):
         return api_repr(False)
 
 if __name__ == '__main__':
-    app.run(debug=True)
-
     # Params for data collection
     trades = ('cs261.dcs.warwick.ac.uk', 80)
     comms = ('cs261.dcs.warwick.ac.uk', 1720)
+    db = 'mysql+mysqldb://CS261:password@127.0.0.1/CS261'
+    memory = 'sqlite://'
     # Load plugins
     trades_id = system.load_plugin('Trades', None, 'NetCap', trades)
     comms_id = system.load_plugin('Comms', None, 'NetCap', comms)
     printer_id = system.load_plugin('Printer', None, 'Printer', None)
+    sql_id = system.load_plugin('SQL', None, 'SQLStore', db)
     # Connect plugins
-    system.connect_plugins(trades_id, printer_id)
-    system.connect_plugins(comms_id, printer_id)
+    system.connect_plugins(trades_id, sql_id)
+    # system.connect_plugins(trades_id, printer_id)
+    system.connect_plugins(comms_id, sql_id)
+    # system.connect_plugins(comms_id, printer_id)
+    # Wait for a bit
+    time.sleep(5)
+    # Unload plugins
+    system.unload_plugin(trades_id)
+    system.unload_plugin(comms_id)
+    system.unload_plugin(printer_id)
+    system.unload_plugin(sql_id)
+
+    # Start wrapper
+    # app.run(debug=True)
 
     print >> sys.stderr, "\n*** STACKTRACE - START ***"
     code = []

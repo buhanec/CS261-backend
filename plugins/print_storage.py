@@ -14,5 +14,5 @@ class PrintStorage(StoragePlugin, Plugin):
         self.logger.info('[PrintStorage] init')
 
     def store(self, data):
-        # sleep(randint(0, 200) / 100)
         print(data)
+        pass
