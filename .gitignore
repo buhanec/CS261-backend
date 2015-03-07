@@ -2,6 +2,7 @@
 trades.csv
 trades_out.csv
 alen/
+*.log
 error.log
 debug.log
 
