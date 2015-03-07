@@ -241,7 +241,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                                 'sender': d[1],
                             })
                         except ValueError:
-                            continue
+                            pass
                         else:
                             id_ = res.inserted_primary_key
                             g_ins.execute(*[
