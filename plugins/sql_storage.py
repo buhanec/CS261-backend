@@ -180,7 +180,6 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self.tables['past_trades'] = t('past_trades', metadata, autoload=True)
         self.tables['live_comms'] = t('live_comms', metadata, autoload=True)
         self.tables['past_comms'] = t('past_comms', metadata, autoload=True)
-        self.Session.remove()
         # Interval-based workers
         now = datetime.now()
         day = now.replace(hour=0, minute=10, second=0, microsecond=0)
@@ -200,6 +199,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self._day_timer = threading.Timer(self._day_time - now,
                                           self.worker_day)
         self._day_timer.start()
+        # expose session for QueryPlugin
+        self._session = session
         # Done with init
         self.status = Plugin.STATUS_INIT
         self.logger.info('[SqlStorage] init')
@@ -393,4 +394,13 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self._day_timer.cancel()
         self._min_timer.join()
         self._day_timer.join()
+        self.Session.remove()
         self.logger.info("[SqlStorage] unload")
+
+    # QueryPlugin
+
+    def trades(self, query, number):
+        trades = self.tables['trades']
+        query = self._session.query(trades).order_by(trades.c.time.desc()).\
+            limit(number)
+        print(query)

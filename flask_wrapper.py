@@ -185,13 +185,15 @@ if __name__ == '__main__':
     comms_id = system.load_plugin('Comms', None, 'NetCap', comms)
     printer_id = system.load_plugin('Printer', None, 'Printer', None)
     sql_id = system.load_plugin('SQL', None, 'SQLStore', db)
+    # sql_id = system.load_plugin('SQL', None, 'SQLStore', memory)
     # Connect plugins
     system.connect_plugins(trades_id, sql_id)
     # system.connect_plugins(trades_id, printer_id)
     system.connect_plugins(comms_id, sql_id)
     # system.connect_plugins(comms_id, printer_id)
     # Wait for a bit
-    time.sleep(30)
+    system.interface.trades(30)
+    # time.sleep(1)
     # Unload plugins
     system.unload_plugin(trades_id)
     system.unload_plugin(comms_id)
