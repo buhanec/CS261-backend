@@ -193,7 +193,7 @@ if __name__ == '__main__':
     # system.connect_plugins(comms_id, printer_id)
     # Wait for a bit
     system.interface.trades(None, 30)
-    time.sleep(1)
+    time.sleep(900)
     # Unload plugins
     system.unload_plugin(trades_id)
     system.unload_plugin(comms_id)

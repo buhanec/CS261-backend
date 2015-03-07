@@ -21,11 +21,36 @@ class NetworkCapture(InputPlugin, Plugin):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         pool = ThreadPool(workers)
         s.connect(self.source)
-        raw = s.recv(self.buffer_size).splitlines()
-        pool.apply_async(callback, ([l.split(",") for l in raw[1:]],))
+        raw = s.recv(self.buffer_size)
+        attach = None
+        if raw[:1] != "\n":
+            raw = raw.rsplit("\n", 1)
+            if len(raw) == 2:
+                attach = raw[1]
+                raw = raw[0]
+                pool.apply_async(callback, ([l.split(",") for l in raw[1:]],))
+            else:
+                attach = raw[0]
+        else:
+            raw = raw.splitlines()
+            pool.apply_async(callback, ([l.split(",") for l in raw[1:]],))
         while not self._threads[threading.current_thread().ident][1].isSet():
-            raw = s.recv(self.buffer_size).splitlines()
-            pool.apply_async(callback, ([l.split(",") for l in raw],))
+            raw = s.recv(self.buffer_size)
+            if attach:
+                raw = attach + raw
+                attach = None
+            if raw[:1] != "\n":
+                raw = raw.rsplit("\n", 1)
+                if len(raw) == 2:
+                    attach = raw[1]
+                    raw = raw[0]
+                    pool.apply_async(callback,
+                                     ([l.split(",") for l in raw[1:]],))
+                else:
+                    attach = raw[0]
+            else:
+                raw = raw.splitlines()
+                pool.apply_async(callback, ([l.split(",") for l in raw[1:]],))
         s.close()
         pool.close()
         pool.join()
