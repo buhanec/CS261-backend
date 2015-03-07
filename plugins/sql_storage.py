@@ -161,7 +161,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         }
         # Create tables
         metadata.create_all(self.engine)
-        # Create views
+        # Create views - format this with timer variable
         session = self.Session()
         try:
             session.execute("CREATE OR REPLACE VIEW live_trades AS SELECT *\
@@ -181,18 +181,25 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self.tables['live_comms'] = t('live_comms', metadata, autoload=True)
         self.tables['past_comms'] = t('past_comms', metadata, autoload=True)
         self.Session.remove()
-        # Set times for workers
+        # Interval-based workers
         now = datetime.now()
-        self._timer_minute = now + timedelta(minutes=1)
-        day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        if now < day:
-            self._timer_day = day.replace(minute=10)
-        else:
-            self._timer_day = day + timedelta(days=1, minutes=10)
-        self._worker_minute = threading.Thread(target=self.worker_minute)
-        self._worker_minute.start()
-        self._worker_day = threading.Thread(target=self.worker_day)
-        self._worker_day.start()
+        day = now.replace(hour=0, minute=10, second=0, microsecond=0)
+        # "Minute" worker
+        self._min_interval_n = 1
+        self._min_interval_m = 10
+        self._min_interval = timedelta(minutes=self._min_interval_n)
+        self._min_time = now + self._min_interval
+        self._min_timer = threading.Timer(self._min_time - now,
+                                          self.worker_minute)
+        self._min_timer.start()
+        # "Day" worker
+        self._day_interval_n = 1
+        self._day_interval_m = 20
+        self._day_interval = timedelta(days=self._day_interval_n)
+        self._day_time = day + self._day_interval
+        self._day_timer = threading.Timer(self._day_time - now,
+                                          self.worker_day)
+        self._day_timer.start()
         # Done with init
         self.status = Plugin.STATUS_INIT
         self.logger.info('[SqlStorage] init')
@@ -281,17 +288,29 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self.Session.remove()
 
     def worker_minute(self):
+        # Schedule next run
+        self._min_time = self._min_time + self._min_interval
+        self._min_timer = threading.Timer(self._min_time - datetime.now(),
+                                          self.worker_minute)
+        self._min_timer.start()
+        # Do work
         session = self.Session()
         comms = self.tables['comms']
+        live_comms = self.tables['live_comms']
+        past_comms = self.tables['past_comms']
         trades = self.tables['trades']
+        live_trades = self.tables['live_trades']
+        past_trades = self.tables['past_trades']
         while not self._terminate.isSet():
             time.sleep(5)
             # Increase live age
             try:
-                c_up = comms.update().values(live=comms.c.live + 1).where(
-                    comms.c.live < 10)
-                t_up = trades.update().values(live=trades.c.live + 1).where(
-                    trades.c.live < 10)
+                c_up = comms.update().\
+                    values(live=comms.c.live + self._min_interval_n).\
+                    where(comms.c.live < self._min_interval_m)
+                t_up = trades.update().\
+                    values(live=trades.c.live + self._min_interval_n).\
+                    where(trades.c.live < self._min_interval_m)
                 c_up.execute()
                 t_up.execute()
                 session.commit()
@@ -316,14 +335,62 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             except:
                 session.rollback()
                 traceback.print_exc()
-
         self.Session.remove()
 
     def worker_day(self):
-        pass
+        # Schedule next run
+        self._day_time = self._day_time + self._day_interval
+        self._day_timer = threading.Timer(self._day_time - datetime.now(),
+                                          self.worker_day)
+        self._day_timer.start()
+        # Do work
+        session = self.Session()
+        comms = self.tables['comms']
+        live_comms = self.tables['live_comms']
+        past_comms = self.tables['past_comms']
+        trades = self.tables['trades']
+        live_trades = self.tables['live_trades']
+        past_trades = self.tables['past_trades']
+        while not self._terminate.isSet():
+            time.sleep(5)
+            # Increase day age
+            try:
+                c_up = comms.update().\
+                    values(day=comms.c.day + self._day_interval_n).\
+                    where(comms.c.day < self._day_interval_m)
+                t_up = trades.update().\
+                    values(day=trades.c.day + self._day_interval_n).\
+                    where(trades.c.day < self._day_interval_m)
+                c_up.execute()
+                t_up.execute()
+                session.commit()
+            except:
+                session.rollback()
+                traceback.print_exc()
+            # Pre-algorithm updates
+            try:
+                queries = []
+                for q in queries:
+                    session.execute(q)
+                session.commit()
+            except:
+                session.rollback()
+                traceback.print_exc()
+            # Perform algorithms and store ids
+            try:
+                queries = []
+                for q in queries:
+                    session.execute(q)
+                session.commit()
+            except:
+                session.rollback()
+                traceback.print_exc()
+        self.Session.remove()
 
     def unload(self):
         super(SqlStorage, self).unload()
-        self._worker_minute.join()
-        self._worker_day.join()
+        self._min_timer.cancel()
+        self._day_timer.cancel()
+        self._min_timer.join()
+        self._day_timer.join()
         self.logger.info("[SqlStorage] unload")
