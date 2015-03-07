@@ -10,9 +10,6 @@ class NoInterfaceSet(System2Exception):
     currently selected
     """
 
-    def __init__(self):
-        super(NoInterfaceSet).__init__()
-
 
 class NoInterface(System2Exception):
     """ Raised when trying to set an interface that does not exist """

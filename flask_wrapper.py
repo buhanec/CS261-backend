@@ -1,18 +1,36 @@
 import sys
 import cdecimal
 sys.modules["decimal"] = cdecimal
+import decimal
+import datetime
 from system2 import TheSystem
 import time
 import traceback
 from flask import request, url_for
 from flask.ext.api import FlaskAPI, status, exceptions
+import signal
+import sys
+from pprint import pprint as pp
 
 app = FlaskAPI(__name__)
 system = TheSystem()
 
 
+def jstr(l):
+    for k, v in enumerate(l):
+        if isinstance(v, decimal.Decimal):
+            l[k] = str(v)
+        elif isinstance(v, datetime.datetime):
+            l[k] = v.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]+'Z'
+    return l
+
+
 def api_repr(value):
-    return {'response': value}
+    print type(value)
+    if type(value) is list or type(value) is tuple:
+        l = [jstr(row) for row in value]
+        return l
+    return str(value)
 
 
 @app.route("/plugins/", methods=['GET'])
@@ -106,7 +124,9 @@ def f13(number):
 @app.route("/data/trades/<string:query>/<int:number>", methods=['GET'])
 def f14(query, number):
     try:
-        return api_repr(system.interface.trades(query, number))
+        result = api_repr(system.interface.trades(query, number))
+        print result
+        return result
     except:
         return api_repr(False)
 
@@ -174,34 +194,39 @@ def f22(column1, column2):
     except:
         return api_repr(False)
 
-if __name__ == '__main__':
+
+def init():
     # Params for data collection
     trades = ('cs261.dcs.warwick.ac.uk', 80)
     comms = ('cs261.dcs.warwick.ac.uk', 1720)
     db = 'mysql+mysqldb://CS261:password@127.0.0.1/CS261'
-    memory = 'sqlite://'
     # Load plugins
     trades_id = system.load_plugin('Trades', None, 'NetCap', trades)
     comms_id = system.load_plugin('Comms', None, 'NetCap', comms)
-    printer_id = system.load_plugin('Printer', None, 'Printer', None)
+    # printer_id = system.load_plugin('Printer', None, 'Printer', None)
     sql_id = system.load_plugin('SQL', None, 'SQLStore', db)
-    # sql_id = system.load_plugin('SQL', None, 'SQLStore', memory)
     # Connect plugins
     system.connect_plugins(trades_id, sql_id)
     # system.connect_plugins(trades_id, printer_id)
     system.connect_plugins(comms_id, sql_id)
     # system.connect_plugins(comms_id, printer_id)
-    # Wait for a bit
-    system.interface.trades(None, 30)
-    time.sleep(900)
-    # Unload plugins
-    system.unload_plugin(trades_id)
-    system.unload_plugin(comms_id)
-    system.unload_plugin(printer_id)
-    system.unload_plugin(sql_id)
 
-    # Start wrapper
-    # app.run(debug=True)
+
+def cleanup():
+    system.unload_all()
+
+
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+
+
+def handler(signal, frame):
+    print ""
+    cleanup()
+    shutdown_server()
 
     print >> sys.stderr, "\n*** STACKTRACE - START ***"
     code = []
@@ -216,3 +241,22 @@ if __name__ == '__main__':
     for line in code:
         print >> sys.stderr, line
     print >> sys.stderr, "\n*** STACKTRACE - END ***\n"
+
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    # Start system
+    init()
+
+    # handler
+    signal.signal(signal.SIGINT, handler)
+
+    # Tests
+    # pp(api_repr(system.interface.trades(None, 3)))
+
+    # Start wrapper
+    app.run(debug=True)
+
+    while True:
+        signal.pause()

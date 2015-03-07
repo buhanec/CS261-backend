@@ -39,7 +39,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         # Types used in tables for easier tweaking
         price = st.Numeric(8, 2)
         email = st.String(254)
-        date = st.DateTime(timezone=True)
+        date = st.DateTime(timezone=True)  # loses microseconds because mysql
         symbol = st.CHAR(7)
         sector = st.String(255)
         volume = st.BigInteger()
@@ -223,12 +223,10 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                     'ask': d[9],
                     'buyer_firm': d[1].rsplit('@', 1)[1],
                     'seller_firm': d[2].rsplit('@', 1)[1]
-                } for d in data if len(d) == 10])  # much slower, but less lost
+                } for d in data])
+                # } for d in data if len(d) == 10])
             except ValueError:
                 self.logger.warn('[SqlStorage] Trade ValueError: %s', pf(data))
-                traceback.print_exc()
-            except IndexError:
-                self.logger.warn('[SqlStorage] Trade IndexError: %s', pf(data))
                 traceback.print_exc()
             session.commit()
         except:
@@ -240,28 +238,20 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         try:
             g_ins = self.tables['recipients'].insert()
             c_ins = self.tables['comms'].insert()
-            try:
-                for d in data:
-                    if len(d) == 3:
-                        try:
-                            res = c_ins.execute({
-                                'time': str2dt(d[0]),
-                                'sender': d[1],
-                            })
-                        except ValueError:
-                            pass
-                        else:
-                            id_ = res.inserted_primary_key
-                            g_ins.execute(*[
-                                {'comm_id': id_, 'recipient': r}
-                                for r in d[2].split(';')
-                            ])
-            except ValueError:
-                self.logger.warn('[SqlStorage] Comm ValueError: %s', pf(data))
-                traceback.print_exc()
-            except IndexError:
-                self.logger.warn('[SqlStorage] Comm IndexError: %s', pf(data))
-                traceback.print_exc()
+            for d in data:
+                try:
+                    res = c_ins.execute({
+                        'time': str2dt(d[0]),
+                        'sender': d[1],
+                    })
+                except ValueError:
+                    pass
+                else:
+                    id_ = res.inserted_primary_key
+                    g_ins.execute(*[
+                        {'comm_id': id_, 'recipient': r}
+                        for r in d[2].split(';')
+                    ])
             session.commit()
         except:
             session.rollback()
@@ -289,8 +279,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self.Session.remove()
 
     def worker_minute(self):
-        # Test
-        print "Running minute worker"
+        self.logger.info('[SqlStorage] Running worker_minute')
         # Schedule next run
         self._min_time = self._min_time + self._min_interval
         timeout = (self._min_time - datetime.now()).total_seconds()
@@ -337,8 +326,10 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             session.rollback()
             traceback.print_exc()
         self.Session.remove()
+        self.logger.info('[SqlStorage] Finished worker_minute')
 
     def worker_day(self):
+        self.logger.info('[SqlStorage] Running worker_day')
         # Schedule next run
         self._day_time = self._day_time + self._day_interval
         timeout = (self._day_time - datetime.now()).total_seconds()
@@ -385,6 +376,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             session.rollback()
             traceback.print_exc()
         self.Session.remove()
+        self.logger.info('[SqlStorage] Finished worker_day')
 
     def unload(self):
         super(SqlStorage, self).unload()
@@ -398,8 +390,46 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
     # QueryPlugin
 
     def trades(self, query, number):
-        return None
-        trades = self.tables['trades']
-        query = self._session.query(trades).order_by(trades.c.time.desc()).\
-            limit(number)
-        print(query)
+        try:
+            trades = self.tables['trades']
+            query = self._session.query(trades).order_by(trades.c.time.desc())\
+                        .limit(number)
+            self._session.commit()
+            return [list(r) for r in self._session.execute(query)]
+        except:
+            self._session.rollback()
+            raise
+
+    def comms(self, query, number):
+        try:
+            comms = self.tables['comms']
+            query = self._session.query(comms).order_by(comms.c.time.desc())\
+                        .limit(number)
+            self._session.commit()
+            return [list(r) for r in self._session.execute(query)]
+        except:
+            self._session.rollback()
+            raise
+
+    def alerts(self, query, number):
+        try:
+            alerts = self.tables['suspicious_trade']
+            query = self._session.query(alerts).order_by(alerts.c.time.desc())\
+                        .limit(number)
+            self._session.commit()
+            return [list(r) for r in self._session.execute(query)]
+        except:
+            self._session.rollback()
+            raise
+
+    def stock(self, symbol):
+        pass
+
+    def trader(self, symbol):
+        pass
+
+    def alert(self, alertid):
+        pass
+
+    def plost_data(self, column1, column2):
+        pass

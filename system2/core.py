@@ -88,8 +88,7 @@ class TheSystem(object):
         try:
             instance = plugin(*(args,))
         except:
-            # raise PluginInitError(plugin)
-            raise
+            raise PluginInitError(plugin)
         self._plugins[plugin_id] = (name, desc, instance)
         if 'input' in plugin.type:
             self._threads['input'][plugin_id] = {}
@@ -117,6 +116,10 @@ class TheSystem(object):
             del self._plugins[id_]
         else:
             raise Exception("plugin does not exist")
+
+    def unload_all(self):
+        for id_ in self._plugins.keys():
+            self.unload_plugin(id_)
 
     def connect_plugins(self, input_, storage):
         callback = self._plugins[storage][2].enqueue
