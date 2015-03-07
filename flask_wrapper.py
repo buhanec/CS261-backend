@@ -192,8 +192,8 @@ if __name__ == '__main__':
     system.connect_plugins(comms_id, sql_id)
     # system.connect_plugins(comms_id, printer_id)
     # Wait for a bit
-    system.interface.trades(30)
-    # time.sleep(1)
+    system.interface.trades(None, 30)
+    time.sleep(1)
     # Unload plugins
     system.unload_plugin(trades_id)
     system.unload_plugin(comms_id)

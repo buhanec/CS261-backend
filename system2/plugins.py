@@ -10,17 +10,19 @@ class Plugins(type):
     """ Plugin metaclass to keep track of plugins """
 
     _plugins = {}
+    _types = {}
 
     def __init__(cls, name, bases, attrs):
         if name not in ['Plugin', 'InputPlugin', 'StoragePlugin',
                         'QueryPlugin']:
             Plugins._plugins[cls._name] = cls
-            if issubclass(cls, InputPlugin):
-                cls._type.append('input')
-            if issubclass(cls, QueryPlugin):
-                cls._type.append('query')
-            if issubclass(cls, StoragePlugin):
-                cls._type.append('storage')
+            Plugins._types[cls] = []
+            if InputPlugin in bases:
+                cls._types[cls].append('input')
+            if QueryPlugin in bases:
+                cls._types[cls].append('query')
+            if StoragePlugin in bases:
+                cls._types[cls].append('storage')
             logger.info('[Plugins] Plugin class %s found', cls._name)
 
     @property
@@ -29,7 +31,7 @@ class Plugins(type):
 
     @property
     def type(cls):
-        return cls._type
+        return cls._types[cls]
 
 
 class Base(object):

@@ -188,16 +188,16 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self._min_interval_m = 10
         self._min_interval = timedelta(minutes=self._min_interval_n)
         self._min_time = now + self._min_interval
-        self._min_timer = threading.Timer(self._min_time - now,
-                                          self.worker_minute)
+        timeout = (self._min_time - now).total_seconds()
+        self._min_timer = threading.Timer(timeout, self.worker_minute)
         self._min_timer.start()
         # "Day" worker
         self._day_interval_n = 1
         self._day_interval_m = 20
         self._day_interval = timedelta(days=self._day_interval_n)
         self._day_time = day + self._day_interval
-        self._day_timer = threading.Timer(self._day_time - now,
-                                          self.worker_day)
+        timeout = (self._day_time - now).total_seconds()
+        self._day_timer = threading.Timer(timeout, self.worker_day)
         self._day_timer.start()
         # expose session for QueryPlugin
         self._session = session
@@ -289,12 +289,14 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self.Session.remove()
 
     def worker_minute(self):
+        # Test
+        print "Running minute worker"
         # Schedule next run
         self._min_time = self._min_time + self._min_interval
-        self._min_timer = threading.Timer(self._min_time - datetime.now(),
-                                          self.worker_minute)
+        timeout = (self._min_time - datetime.now()).total_seconds()
+        self._min_timer = threading.Timer(timeout, self.worker_minute)
         self._min_timer.start()
-        # Do work
+        # Aliases for ease of use
         session = self.Session()
         comms = self.tables['comms']
         live_comms = self.tables['live_comms']
@@ -302,49 +304,47 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         trades = self.tables['trades']
         live_trades = self.tables['live_trades']
         past_trades = self.tables['past_trades']
-        while not self._terminate.isSet():
-            time.sleep(5)
-            # Increase live age
-            try:
-                c_up = comms.update().\
-                    values(live=comms.c.live + self._min_interval_n).\
-                    where(comms.c.live < self._min_interval_m)
-                t_up = trades.update().\
-                    values(live=trades.c.live + self._min_interval_n).\
-                    where(trades.c.live < self._min_interval_m)
-                c_up.execute()
-                t_up.execute()
-                session.commit()
-            except:
-                session.rollback()
-                traceback.print_exc()
-            # Pre-algorithm updates
-            try:
-                queries = []
-                for q in queries:
-                    session.execute(q)
-                session.commit()
-            except:
-                session.rollback()
-                traceback.print_exc()
-            # Perform algorithms and store ids
-            try:
-                queries = []
-                for q in queries:
-                    session.execute(q)
-                session.commit()
-            except:
-                session.rollback()
-                traceback.print_exc()
+        # Increase live age
+        try:
+            c_up = comms.update().\
+                values(live=comms.c.live + self._min_interval_n).\
+                where(comms.c.live < self._min_interval_m)
+            t_up = trades.update().\
+                values(live=trades.c.live + self._min_interval_n).\
+                where(trades.c.live < self._min_interval_m)
+            c_up.execute()
+            t_up.execute()
+            session.commit()
+        except:
+            session.rollback()
+            traceback.print_exc()
+        # Pre-algorithm updates
+        try:
+            queries = []
+            for q in queries:
+                session.execute(q)
+            session.commit()
+        except:
+            session.rollback()
+            traceback.print_exc()
+        # Perform algorithms and store ids
+        try:
+            queries = []
+            for q in queries:
+                session.execute(q)
+            session.commit()
+        except:
+            session.rollback()
+            traceback.print_exc()
         self.Session.remove()
 
     def worker_day(self):
         # Schedule next run
         self._day_time = self._day_time + self._day_interval
-        self._day_timer = threading.Timer(self._day_time - datetime.now(),
-                                          self.worker_day)
+        timeout = (self._day_time - datetime.now()).total_seconds()
+        self._day_timer = threading.Timer(timeout, self.worker_day)
         self._day_timer.start()
-        # Do work
+        # Aliases for ease of use
         session = self.Session()
         comms = self.tables['comms']
         live_comms = self.tables['live_comms']
@@ -352,40 +352,38 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         trades = self.tables['trades']
         live_trades = self.tables['live_trades']
         past_trades = self.tables['past_trades']
-        while not self._terminate.isSet():
-            time.sleep(5)
-            # Increase day age
-            try:
-                c_up = comms.update().\
-                    values(day=comms.c.day + self._day_interval_n).\
-                    where(comms.c.day < self._day_interval_m)
-                t_up = trades.update().\
-                    values(day=trades.c.day + self._day_interval_n).\
-                    where(trades.c.day < self._day_interval_m)
-                c_up.execute()
-                t_up.execute()
-                session.commit()
-            except:
-                session.rollback()
-                traceback.print_exc()
-            # Pre-algorithm updates
-            try:
-                queries = []
-                for q in queries:
-                    session.execute(q)
-                session.commit()
-            except:
-                session.rollback()
-                traceback.print_exc()
-            # Perform algorithms and store ids
-            try:
-                queries = []
-                for q in queries:
-                    session.execute(q)
-                session.commit()
-            except:
-                session.rollback()
-                traceback.print_exc()
+        # Increase day age
+        try:
+            c_up = comms.update().\
+                values(day=comms.c.day + self._day_interval_n).\
+                where(comms.c.day < self._day_interval_m)
+            t_up = trades.update().\
+                values(day=trades.c.day + self._day_interval_n).\
+                where(trades.c.day < self._day_interval_m)
+            c_up.execute()
+            t_up.execute()
+            session.commit()
+        except:
+            session.rollback()
+            traceback.print_exc()
+        # Pre-algorithm updates
+        try:
+            queries = []
+            for q in queries:
+                session.execute(q)
+            session.commit()
+        except:
+            session.rollback()
+            traceback.print_exc()
+        # Perform algorithms and store ids
+        try:
+            queries = []
+            for q in queries:
+                session.execute(q)
+            session.commit()
+        except:
+            session.rollback()
+            traceback.print_exc()
         self.Session.remove()
 
     def unload(self):
@@ -400,6 +398,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
     # QueryPlugin
 
     def trades(self, query, number):
+        return None
         trades = self.tables['trades']
         query = self._session.query(trades).order_by(trades.c.time.desc()).\
             limit(number)
