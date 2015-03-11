@@ -1,3 +1,4 @@
+
 import sys
 import cdecimal
 sys.modules["decimal"] = cdecimal
@@ -6,15 +7,15 @@ import datetime
 from system2 import TheSystem
 import time
 import traceback
-from flask import Flask, request, url_for
+from flask import Flask, request, url_for, Response, make_response
 from flask import request, render_template, current_app
 from flask.ext.api import FlaskAPI, status, exceptions
 import signal
+import json
 import sys
 from pprint import pprint as pp
 
-app = FlaskAPI(__name__)
-flask = Flask(__name__, static_url_path='/srv/www/CS261')
+app = Flask(__name__)
 system = TheSystem()
 
 
@@ -30,8 +31,13 @@ def jstr(l):
 def api_repr(value):
     if type(value) is list or type(value) is tuple:
         l = [jstr(row) for row in value]
-        return l
-    return str(value)
+    else:
+        l = str(value)
+    content = json.dumps(l)
+    response = make_response(content)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Content-type'] = 'application/jsonify'
+    return response
 
 
 @app.route("/plugins/", methods=['GET'])
@@ -119,6 +125,7 @@ def f13(number):
     try:
         return api_repr(system.interface.trades(None, number))
     except:
+        raise
         return api_repr(False)
 
 
@@ -194,32 +201,14 @@ def f22(column1, column2):
     except:
         return api_repr(False)
 
-class SpecialSnowflake(BaseRenderer):
-    media_type = 'application/json'
-    charset = None
+@app.route('/todo/api/v1.0/tasks', methods=['GET'])
+def get_tasks():
+    return jsonify({'tasks': 'todo'})
 
-    def render(self, data, media_type, **options):
-        # Requested indentation may be set in the Accept header.
-        try:
-            indent = max(min(int(media_type.params['indent']), 8), 0)
-        except (KeyError, ValueError, TypeError):
-            indent = None
-        # Indent may be set explicitly, eg when rendered by the browsable API.
-        indent = options.get('indent', indent)
 
-        # headers
-        headers = options['headers']
-        headers['Access-Control-Allow-Origin'] = "*"
-        context = {
-            'status': 200,
-            'headers': headers,
-            'content': mock_content,
-            'allowed_methods': allowed_methods,
-            'view_name': convert_to_title(view_name),
-            'view_description': view_description,
-            'version': __version__
-        }
-        return render_template('base.html', **context)
+@app.route('/')
+def root():
+  return app.send_static_file('/srv/www/CS261/index.html')
 
 
 def init():
@@ -283,7 +272,6 @@ if __name__ == '__main__':
     # pp(api_repr(system.interface.trades(None, 3)))
 
     # Start wrapper
-    flask.run()
     app.run(debug=True, host='0.0.0.0')
 
     while True:

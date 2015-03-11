@@ -164,9 +164,9 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         # Create views - format this with timer variable
         session = self.Session()
         try:
-            session.execute("CREATE OR REPLACE VIEW live_trades AS SELECT *\
+            session.execute("CREATE OR REPLACE VIEW live_tradess AS SELECT *\
                             FROM trades WHERE live < 10")
-            session.execute("CREATE OR REPLACE VIEW past_trades AS SELECT *\
+            session.execute("CREATE OR REPLACE VIEW past_tradess AS SELECT *\
                             FROM trades WHERE live >= 10 AND day < 20")
             session.execute("CREATE OR REPLACE VIEW live_comms AS SELECT *\
                             FROM comms WHERE live < 10")
@@ -176,8 +176,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         except:
             session.rollback()
             raise
-        self.tables['live_trades'] = t('live_trades', metadata, autoload=True)
-        self.tables['past_trades'] = t('past_trades', metadata, autoload=True)
+        self.tables['live_tradess'] = t('live_tradess', metadata, autoload=True)
+        self.tables['past_tradess'] = t('past_tradess', metadata, autoload=True)
         self.tables['live_comms'] = t('live_comms', metadata, autoload=True)
         self.tables['past_comms'] = t('past_comms', metadata, autoload=True)
         # Interval-based workers
@@ -291,8 +291,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         live_comms = self.tables['live_comms']
         past_comms = self.tables['past_comms']
         trades = self.tables['trades']
-        live_trades = self.tables['live_trades']
-        past_trades = self.tables['past_trades']
+        live_tradess = self.tables['live_tradess']
+        past_tradess = self.tables['past_tradess']
         # Increase live age
         try:
             c_up = comms.update().\
@@ -309,9 +309,16 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             traceback.print_exc()
         # Pre-algorithm updates
         try:
-            queries = []
+            queries = [
+                # Preperations
+
+                # Algo
+
+            ]
+
             for q in queries:
-                session.execute(q)
+                pass
+                #session.execute(q)
             session.commit()
         except:
             session.rollback()
@@ -341,8 +348,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         live_comms = self.tables['live_comms']
         past_comms = self.tables['past_comms']
         trades = self.tables['trades']
-        live_trades = self.tables['live_trades']
-        past_trades = self.tables['past_trades']
+        live_tradess = self.tables['live_tradess']
+        past_tradess = self.tables['past_tradess']
         # Increase day age
         try:
             c_up = comms.update().\
@@ -359,7 +366,9 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             traceback.print_exc()
         # Pre-algorithm updates
         try:
-            queries = []
+            queries = [
+
+            ]
             for q in queries:
                 session.execute(q)
             session.commit()

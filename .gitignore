@@ -5,6 +5,7 @@ alen/
 *.log
 error.log
 debug.log
+sftp-config.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
