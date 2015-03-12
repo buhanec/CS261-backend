@@ -39,6 +39,9 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
 
         def c(*args, **kwargs):
             return sa.Column(*args, nullable=False, **kwargs)
+
+        def n(*args, **kwargs):
+            return sa.Column(*args, nullable=True, **kwargs)
         t = sa.Table
         # Types used in tables for easier tweaking
         price = st.Numeric(8, 2)
@@ -100,9 +103,10 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 'alerts', metadata,
                 c('id', pkey, primary_key=True, autoincrement=True),
                 c('trade_id', pkey),
+                c('severity', st.Float()),
                 c('alert_type', alert_type),
-                c('comms', pkey),
-                c('trades', pkey)
+                n('comms', pkey),
+                n('trades', pkey)
             ),
             'comm_clusters': t(
                 'comm_clusters', metadata,
@@ -152,8 +156,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self._YOU_SHALL_NOT_PASS.acquire()
         try:
             ins = self.tables['trades'].insert()
-            try:
-                ins.execute(*[{
+            for d in data:
+                result = ins.execute({
                     'time': str2dt(d[0]),
                     'buyer': d[1],
                     'seller': d[2],
@@ -166,7 +170,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                     'ask': d[9],
                     'buyer_firm': d[1].rsplit('@', 1)[1],
                     'seller_firm': d[2].rsplit('@', 1)[1]
-                } for d in data])
+                })
+                tradeid = result.inserted_primary_key[0]
                 fixthis = '\
 SET @symbol = \''+d[6]+'\'; \
 SET @price = '+d[3]+'; \
@@ -182,16 +187,25 @@ ON DUPLICATE KEY UPDATE \
 `avg_size` = (SELECT AVG(`size`) FROM `trades` \
               WHERE `symbol` = @symbol), \
 `std_size` = (SELECT STD(`size`) FROM `trades` \
-              WHERE `symbol` = @symbol); \
-                '
+              WHERE `symbol` = @symbol);'
                 session.execute(fixthis)
-
-                # } for d in data if len(d) == 10])
-            except ValueError:
-                self.logger.warn('[SqlStorage] Trade ValueError: %s', pf(data))
-                traceback.print_exc()
-            session.commit()
+                session.commit()
+                fixme = 'SELECT * FROM `stocks` WHERE `symbol` =  \''+d[6]+'\'';
+                result = session.execute(fixme)
+                session.commit()
+                r = [r for r in result][0]
+                price = float(d[3])
+                size = float(d[4])
+                if r[5] > 10:
+                    print "checking"
+                    dprice = abs(price - r[1])/r[3]
+                    dvolume = abs(size - r[2])/r[4]
+                    if dprice > 2:
+                        session.execute('INSERT INTO `alerts` (`trade_id`, `severity`, `alert_type`, `comms`, `trades`) VALUES ('+str(tradeid)+', '+str(dprice)+', \'Price\', null, null)')
+                    if dvolume > 2:
+                        session.execute('INSERT INTO `alerts` (`trade_id`, `severity`, `alert_type`, `comms`, `trades`) VALUES ('+str(tradeid)+', '+str(dvolume)+', \'Volume\', null, null)')
         except:
+            raise
             session.rollback()
             traceback.print_exc()
         finally:
@@ -232,7 +246,7 @@ ON DUPLICATE KEY UPDATE \
             elif len(data[0]) == 10:
                 self.store_trades(data, session)
         self._min_count_sem.acquire()
-        self._min_count = self._min_count - 1;
+        self._min_count = self._min_count - 1
         if self._min_count == 0:
             try:
                 self._min_timer.cancel()
@@ -397,8 +411,6 @@ ON DUPLICATE KEY UPDATE \
             query = self._session.query(comms).order_by(comms.c.time.desc())\
                         .limit(number)
             self._session.commit()
-            # l = [list(r)[:-3] + [self.recipients(list(r)[-3])]
-                 # for r in self._session.execute(query)]
             l = [list(r)[:-2] + [self.recipients(list(r)[0])]
                  for r in self._session.execute(query)]
             return l

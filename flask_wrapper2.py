@@ -1,4 +1,3 @@
-
 import sys
 import cdecimal
 sys.modules["decimal"] = cdecimal
@@ -14,6 +13,7 @@ import signal
 import json
 import sys
 from pprint import pprint as pp
+import subprocess
 
 app = Flask(__name__)
 system = TheSystem()
@@ -269,7 +269,9 @@ if __name__ == '__main__':
     # time.sleep(1)
     # pp(system.interface.trades(None, 3))
     # Start wrapper
-    app.run(debug=True, host='0.0.0.0')
+    # app.run(debug=True, host='0.0.0.0')
+
+    subprocess.Popen(['pip', 'freeze'], stdout=open('/tmp/pip.log', 'w'))
 
     while True:
         signal.pause()
