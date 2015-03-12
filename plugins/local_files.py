@@ -10,8 +10,8 @@ class FileInput(InputPlugin, Plugin):
 
     _name = 'FileReader'
 
-    def __init__(self, source):
-        super(FileInput, self).__init__()
+    def __init__(self, source, unloader=None):
+        super(FileInput, self).__init__(unloader=unloader)
         self.source = source
         self.logger.info('[FileInput] init')
 

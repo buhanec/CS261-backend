@@ -269,10 +269,10 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, handler)
 
     # Tests
-    # pp(api_repr(system.interface.trades(None, 3)))
+    pp(system.interface.comms(None, 8))
 
     # Start wrapper
-    app.run(debug=True, host='0.0.0.0')
+    # app.run(debug=True, host='0.0.0.0')
 
     while True:
         signal.pause()

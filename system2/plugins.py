@@ -60,10 +60,11 @@ class Plugin(Base):
     _name = None
     _type = []
 
-    def __init__(self):
+    def __init__(self, unloader=None):
         super(Plugin, self).__init__()
         self.status = Plugin.STATUS_BASE
         self.logger = logger
+        self.unloader = unloader
         logger.info('[Plugin] init')
 
     @property
@@ -88,8 +89,8 @@ class InputPlugin(object):
     """ Input plugin mixin """
     __metaclass__ = Plugins
 
-    def __init__(self):
-        super(InputPlugin, self).__init__()
+    def __init__(self, unloader=None):
+        super(InputPlugin, self).__init__(unloader=unloader)
         self._status = Plugin.STATUS_MIXIN
         self._threads = {}
         self._sem = threading.Semaphore(1)
@@ -155,8 +156,8 @@ class StoragePlugin(object):
     """ Storage plugin mixin """
     __metaclass__ = Plugins
 
-    def __init__(self, queue_size=0, workers=cpu_count()):
-        super(StoragePlugin, self).__init__()
+    def __init__(self, queue_size=0, workers=cpu_count(), unloader=None):
+        super(StoragePlugin, self).__init__(unloader=None)
         self._status = Plugin.STATUS_MIXIN
         self._q = Queue(queue_size)
         self._threads = []
@@ -197,6 +198,10 @@ class StoragePlugin(object):
         for thread in self._threads:
             thread.join()
         logger.info("[StoragePlugin] unloaded")
+        if self.unloader is not None:
+            logger.info("[StoragePlugin] calling external unloader")
+            self.unloader()
+
 
 
 class QueryPlugin(object):
@@ -206,8 +211,8 @@ class QueryPlugin(object):
     """
     __metaclass__ = Plugins
 
-    def __init__(self):
-        super(QueryPlugin, self).__init__()
+    def __init__(self, unloader=None):
+        super(QueryPlugin, self).__init__(unloader=unloader)
         self._status = Plugin.STATUS_MIXIN
 
     def trades(self, query, number):

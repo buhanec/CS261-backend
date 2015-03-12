@@ -4,6 +4,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 import sqlalchemy.types as st
 from datetime import datetime, timedelta
 from pprint import pformat as pf
+from pprint import pprint as pp
 import time
 import threading
 import traceback
@@ -18,8 +19,10 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
 
     _name = 'SQLStore'
 
-    def __init__(self, db='mysql+mysqldb://CS261:password@127.0.0.1/CS261'):
-        super(SqlStorage, self).__init__()
+    def __init__(self,
+                 db='mysql+mysqldb://CS261:password@127.0.0.1/CS261',
+                 unloader=None):
+        super(SqlStorage, self).__init__(unloader=unloader)
         # Engine and session factory
         self.engine = sa.create_engine(
             db,
@@ -46,17 +49,20 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         day = st.Integer()
         live = st.SmallInteger()
         firm = st.String(30)
-        currency = st.Enum(('GBX'))
+        currency = st.Enum('GBX')
         percent = st.Numeric(3, 2)
         spread = st.Numeric(3, 2)
         perf = st.Numeric(3, 2)
         num_dev = st.Numeric(2, 2)
         trade_id = st.BigInteger()
         comm_id = st.BigInteger()
+        cluster_id = st.BigInteger()
+        alert_type = st.Enum('Volume', 'Price')
         # All the tables
         self.tables = {
             'trades': t(
                 'trades', metadata,
+                c('trade_id', trade_id, primary_key=True, autoincrement=True),
                 c('time', date),
                 c('buyer', email),
                 c('seller', email),
@@ -67,11 +73,10 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 c('sector', sector),
                 c('bid', price),
                 c('ask', price),
+                c('buyer_firm', firm),
+                c('seller_firm', firm),
                 c('day', day, default=0),
                 c('live', live, default=0),
-                c('trade_id', trade_id, primary_key=True, autoincrement=True),
-                c('buyer_firm', firm),
-                c('seller_firm', firm)
             ),
             'comms': t(
                 'comms', metadata,
@@ -86,10 +91,11 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 c('comm_id', comm_id),
                 c('recipient', email)
             ),
-            'averages_trade': t(
-                'averages_trade', metadata,
+            'avg_trades': t(
+                'avg_trades', metadata,
                 c('symbol', symbol, primary_key=True),
                 c('sector', sector),
+                c('currency', currency),
                 c('one_day_close', price),
                 c('five_day_close', price),
                 c('twenty_day_close', price),
@@ -157,6 +163,13 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 c('portfolio_firm', firm),
                 c('portfolio_symbol', symbol),
                 c('trader_activity_trade_id', trade_id),
+            ),
+            'alerts': t(
+                'alerts', metadata,
+                c('trade_id', trade_id),
+                c('alert_type', alert_type),
+                c('trade_cluster', cluster_id),
+                c('comm_cluster', cluster_id),
             )
         }
         # Create tables
@@ -164,9 +177,9 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         # Create views - format this with timer variable
         session = self.Session()
         try:
-            session.execute("CREATE OR REPLACE VIEW live_tradess AS SELECT *\
+            session.execute("CREATE OR REPLACE VIEW live_trades AS SELECT *\
                             FROM trades WHERE live < 10")
-            session.execute("CREATE OR REPLACE VIEW past_tradess AS SELECT *\
+            session.execute("CREATE OR REPLACE VIEW past_trades AS SELECT *\
                             FROM trades WHERE live >= 10 AND day < 20")
             session.execute("CREATE OR REPLACE VIEW live_comms AS SELECT *\
                             FROM comms WHERE live < 10")
@@ -291,8 +304,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         live_comms = self.tables['live_comms']
         past_comms = self.tables['past_comms']
         trades = self.tables['trades']
-        live_tradess = self.tables['live_tradess']
-        past_tradess = self.tables['past_tradess']
+        live_trades = self.tables['live_trades']
+        past_trades = self.tables['past_trades']
         # Increase live age
         try:
             c_up = comms.update().\
@@ -348,8 +361,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         live_comms = self.tables['live_comms']
         past_comms = self.tables['past_comms']
         trades = self.tables['trades']
-        live_tradess = self.tables['live_tradess']
-        past_tradess = self.tables['past_tradess']
+        live_trades = self.tables['live_trades']
+        past_trades = self.tables['past_trades']
         # Increase day age
         try:
             c_up = comms.update().\
@@ -387,6 +400,15 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self.Session.remove()
         self.logger.info('[SqlStorage] Finished worker_day')
 
+    def worker_file(self):
+        pass
+
+    def find_volume_spike(self):
+        pass
+
+    def find_price_spike(self):
+        pass
+
     def unload(self):
         super(SqlStorage, self).unload()
         self._min_timer.cancel()
@@ -404,7 +426,18 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             query = self._session.query(trades).order_by(trades.c.time.desc())\
                         .limit(number)
             self._session.commit()
-            return [list(r) for r in self._session.execute(query)]
+            return [list(r)[:-2] for r in self._session.execute(query)]
+        except:
+            self._session.rollback()
+            raise
+
+    def recipients(self, comm_id):
+        try:
+            recipients = self.tables['recipients']
+            query = self._session.query(recipients)\
+                        .filter(recipients.c.comm_id == comm_id)
+            self._session.commit()
+            return [r[1] for r in self._session.execute(query)]
         except:
             self._session.rollback()
             raise
@@ -415,7 +448,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             query = self._session.query(comms).order_by(comms.c.time.desc())\
                         .limit(number)
             self._session.commit()
-            return [list(r) for r in self._session.execute(query)]
+            l =  [list(r)[:-2] for r in self._session.execute(query)]
+            return l
         except:
             self._session.rollback()
             raise

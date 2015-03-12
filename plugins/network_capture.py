@@ -10,8 +10,8 @@ class NetworkCapture(InputPlugin, Plugin):
 
     _name = 'NetCap'
 
-    def __init__(self, source, buffer_size=1024):
-        super(NetworkCapture, self).__init__()
+    def __init__(self, source, buffer_size=1024, unloader=None):
+        super(NetworkCapture, self).__init__(unloader=unloader)
         self.source = source
         self.buffer_size = buffer_size
         self.status = Plugin.STATUS_INIT
@@ -23,7 +23,7 @@ class NetworkCapture(InputPlugin, Plugin):
         s.connect(self.source)
         raw = s.recv(self.buffer_size)
         attach = None
-        if raw[:1] != "\n":
+        if raw[-1] != "\n":
             raw = raw.rsplit("\n", 1)
             if len(raw) == 2:
                 attach = raw[1]
@@ -39,18 +39,22 @@ class NetworkCapture(InputPlugin, Plugin):
             if attach:
                 raw = attach + raw
                 attach = None
-            if raw[:1] != "\n":
-                raw = raw.rsplit("\n", 1)
-                if len(raw) == 2:
-                    attach = raw[1]
-                    raw = raw[0]
+            try:
+                if raw[-1] != "\n":
+                    raw = raw.rsplit("\n", 1)
+                    if len(raw) == 2:
+                        attach = raw[1]
+                        raw = raw[0]
+                        pool.apply_async(callback,
+                                         ([l.split(",") for l in raw[1:]],))
+                    else:
+                        attach = raw[0]
+                else:
+                    raw = raw.splitlines()
                     pool.apply_async(callback,
                                      ([l.split(",") for l in raw[1:]],))
-                else:
-                    attach = raw[0]
-            else:
-                raw = raw.splitlines()
-                pool.apply_async(callback, ([l.split(",") for l in raw[1:]],))
+            except KeyError:
+                pass
         s.close()
         pool.close()
         pool.join()

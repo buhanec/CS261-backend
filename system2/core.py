@@ -86,9 +86,11 @@ class TheSystem(object):
         except KeyError:
             raise MissingPlugin(plugin)
         try:
-            instance = plugin(*(args,))
+            instance = plugin(*(args,),
+                              unloader=(lambda: self.unload(plugin_id)))
         except:
-            raise PluginInitError(plugin)
+            raise
+            #raise PluginInitError(plugin)
         self._plugins[plugin_id] = (name, desc, instance)
         if 'input' in plugin.type:
             self._threads['input'][plugin_id] = {}

@@ -8,8 +8,8 @@ class PrintStorage(StoragePlugin, Plugin):
 
     _name = 'Printer'
 
-    def __init__(self, buffer_size=1024):
-        super(PrintStorage, self).__init__()
+    def __init__(self, unloader=None):
+        super(PrintStorage, self).__init__(unloader=unloader)
         self._status = Plugin.STATUS_INIT
         self.logger.info('[PrintStorage] init')
 
