@@ -267,7 +267,7 @@ if __name__ == '__main__':
     # Tests
     # pp(system.interface.comms(None, 3))
     # time.sleep(1)
-    # pp(system.interface.trades(None, 3))
+    pp(system.interface.trade(3))
     # Start wrapper
     # app.run(debug=True, host='0.0.0.0')
 

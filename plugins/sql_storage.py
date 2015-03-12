@@ -383,6 +383,16 @@ ON DUPLICATE KEY UPDATE \
 
     # QueryPlugin
 
+    def trade(self, id_):
+        try:
+            trades = self.tables['trades']
+            query = self._session.query(trades).filter(trades.c.id == id_)
+            self._session.commit()
+            return [r for r in self._session.execute(query)][-2]
+        except:
+            self._session.rollback()
+            raise
+
     def trades(self, query, number):
         try:
             trades = self.tables['trades']
