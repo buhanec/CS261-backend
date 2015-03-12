@@ -129,12 +129,12 @@ def f13(number):
         return api_repr(False)
 
 
-@app.route("/data/trades/<string:query>/<int:number>", methods=['GET'])
-def f14(query, number):
+@app.route("/data/trade/<int:number>", methods=['GET'])
+def f13(number):
     try:
-        result = api_repr(system.interface.trades(query, number))
-        return result
+        return api_repr(system.interface.trade(number))
     except:
+        raise
         return api_repr(False)
 
 
@@ -146,26 +146,10 @@ def f15(number):
         return api_repr(False)
 
 
-@app.route("/data/comms/<string:query>/<int:number>", methods=['GET'])
-def f16(query, number):
-    try:
-        return api_repr(system.interface.comms(query, number))
-    except:
-        return api_repr(False)
-
-
 @app.route("/data/alerts/<int:number>", methods=['GET'])
 def f17(number):
     try:
         return api_repr(system.interface.alerts(None, number))
-    except:
-        return api_repr(False)
-
-
-@app.route("/data/alerts/<string:query>/<int:number>", methods=['GET'])
-def f18(query, number):
-    try:
-        return api_repr(system.interface.alerts(query, number))
     except:
         return api_repr(False)
 
@@ -192,19 +176,6 @@ def f21(alertid):
         return api_repr(system.interface.alert(alertid))
     except:
         return api_repr(False)
-
-
-@app.route("/data/plot/<string:column1>/<string:column2>")
-def f22(column1, column2):
-    try:
-        return api_repr(system.interface.plot_data(column1, column2))
-    except:
-        return api_repr(False)
-
-
-@app.route('/')
-def root():
-    return app.send_static_file('/srv/www/CS261/index.html')
 
 
 def init():

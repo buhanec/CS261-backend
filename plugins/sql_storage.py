@@ -197,7 +197,6 @@ ON DUPLICATE KEY UPDATE \
                 price = float(d[3])
                 size = float(d[4])
                 if r[5] > 10:
-                    print "checking"
                     dprice = abs(price - r[1])/r[3]
                     dvolume = abs(size - r[2])/r[4]
                     if dprice > 2:
@@ -388,7 +387,7 @@ ON DUPLICATE KEY UPDATE \
             trades = self.tables['trades']
             query = self._session.query(trades).filter(trades.c.id == id_)
             self._session.commit()
-            return [r for r in self._session.execute(query)][-2]
+            return [list(r)[:-2] for r in self._session.execute(query)][0]
         except:
             self._session.rollback()
             raise
@@ -430,11 +429,11 @@ ON DUPLICATE KEY UPDATE \
 
     def alerts(self, query, number):
         try:
-            alerts = self.tables['suspicious_trade']
+            alerts = self.tables['alerts']
             query = self._session.query(alerts).order_by(alerts.c.time.desc())\
                         .limit(number)
             self._session.commit()
-            return [list(r) for r in self._session.execute(query)]
+            return [list(r)[-2] for r in self._session.execute(query)]
         except:
             self._session.rollback()
             raise
