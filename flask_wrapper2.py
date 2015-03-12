@@ -265,8 +265,9 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, handler)
 
     # Tests
-    pp(system.interface.comms(None, 8))
-
+    # pp(system.interface.comms(None, 3))
+    # time.sleep(1)
+    # pp(system.interface.trades(None, 3))
     # Start wrapper
     app.run(debug=True, host='0.0.0.0')
 

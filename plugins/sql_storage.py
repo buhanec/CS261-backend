@@ -120,6 +120,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         # Interval-based workers
         now = datetime.now()
         day = now.replace(hour=0, minute=10, second=0, microsecond=0)
+        # How2threadsafe
+        self._YOU_SHALL_NOT_PASS = Semaphore(1)
         # "Minute" worker
         self._min_count_sem = Semaphore(1)
         self._min_count_m = 100
@@ -147,6 +149,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
 
     def store_trades(self, data, session):
         """ Stores trades """
+        self._YOU_SHALL_NOT_PASS.acquire()
         try:
             ins = self.tables['trades'].insert()
             try:
@@ -168,8 +171,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
 SET @symbol = \''+d[6]+'\'; \
 SET @price = '+d[3]+'; \
 SET @size = '+d[4]+'; \
-INSERT INTO `stocks` (`symbol`, `avg_price`, `avg_size`, `count`) \
-VALUES (@symbol, @price, @size, 1) \
+INSERT INTO `stocks` (`symbol`, `avg_price`, `avg_size`, `std_price`, `std_size`, `count`) \
+VALUES (@symbol, @price, @size, 0, 0, 1) \
 ON DUPLICATE KEY UPDATE \
 `count` = `count` + 1, \
 `avg_price` = (SELECT AVG(`price`) FROM `trades` \
@@ -182,6 +185,7 @@ ON DUPLICATE KEY UPDATE \
               WHERE `symbol` = @symbol); \
                 '
                 session.execute(fixthis)
+
                 # } for d in data if len(d) == 10])
             except ValueError:
                 self.logger.warn('[SqlStorage] Trade ValueError: %s', pf(data))
@@ -190,9 +194,12 @@ ON DUPLICATE KEY UPDATE \
         except:
             session.rollback()
             traceback.print_exc()
+        finally:
+            self._YOU_SHALL_NOT_PASS.release()
 
     def store_comms(self, data, session):
         """ Stores comms """
+        self._YOU_SHALL_NOT_PASS.acquire()
         try:
             g_ins = self.tables['recipients'].insert()
             c_ins = self.tables['comms'].insert()
@@ -214,6 +221,8 @@ ON DUPLICATE KEY UPDATE \
         except:
             session.rollback()
             traceback.print_exc()
+        finally:
+            self._YOU_SHALL_NOT_PASS.release()
 
     def burst_store(self, data, session):
         """ Stores multiple entry data into storage """
@@ -248,6 +257,7 @@ ON DUPLICATE KEY UPDATE \
 
     def worker_minute(self):
         self.logger.info('[SqlStorage] Running worker_minute')
+        self._YOU_SHALL_NOT_PASS.acquire()
         # Schedule next run
         self._min_time = self._min_time + self._min_interval
         timeout = (self._min_time - datetime.now()).total_seconds()
@@ -291,10 +301,12 @@ ON DUPLICATE KEY UPDATE \
             session.rollback()
             traceback.print_exc()
         self.Session.remove()
+        self._YOU_SHALL_NOT_PASS.release()
         self.logger.info('[SqlStorage] Finished worker_minute')
 
     def worker_day(self):
         self.logger.info('[SqlStorage] Running worker_day')
+        self._YOU_SHALL_NOT_PASS.acquire()
         # Schedule next run
         self._day_time = self._day_time + self._day_interval
         timeout = (self._day_time - datetime.now()).total_seconds()
@@ -338,15 +350,7 @@ ON DUPLICATE KEY UPDATE \
             traceback.print_exc()
         self.Session.remove()
         self.logger.info('[SqlStorage] Finished worker_day')
-
-    def worker_file(self):
-        pass
-
-    def find_volume_spike(self):
-        pass
-
-    def find_price_spike(self):
-        pass
+        self._YOU_SHALL_NOT_PASS.release()
 
     def unload(self):
         super(SqlStorage, self).unload()
@@ -393,7 +397,9 @@ ON DUPLICATE KEY UPDATE \
             query = self._session.query(comms).order_by(comms.c.time.desc())\
                         .limit(number)
             self._session.commit()
-            l = [list(r)[:-3] + [self.recipients(list(r)[-3])]
+            # l = [list(r)[:-3] + [self.recipients(list(r)[-3])]
+                 # for r in self._session.execute(query)]
+            l = [list(r)[:-2] + [self.recipients(list(r)[0])]
                  for r in self._session.execute(query)]
             return l
         except:

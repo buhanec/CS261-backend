@@ -156,7 +156,7 @@ class StoragePlugin(object):
     """ Storage plugin mixin """
     __metaclass__ = Plugins
 
-    def __init__(self, queue_size=0, workers=cpu_count(), unloader=None):
+    def __init__(self, queue_size=0, workers=1, unloader=None):
         super(StoragePlugin, self).__init__(unloader=None)
         self._status = Plugin.STATUS_MIXIN
         self._q = Queue(queue_size)
