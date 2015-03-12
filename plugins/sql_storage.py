@@ -176,8 +176,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         except:
             session.rollback()
             raise
-        self.tables['live_tradess'] = t('live_tradess', metadata, autoload=True)
-        self.tables['past_tradess'] = t('past_tradess', metadata, autoload=True)
+        self.tables['live_trades'] = t('live_trades', metadata, autoload=True)
+        self.tables['past_trades'] = t('past_trades', metadata, autoload=True)
         self.tables['live_comms'] = t('live_comms', metadata, autoload=True)
         self.tables['past_comms'] = t('past_comms', metadata, autoload=True)
         # Interval-based workers

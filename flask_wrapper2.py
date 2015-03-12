@@ -36,7 +36,7 @@ def api_repr(value):
     content = json.dumps(l)
     response = make_response(content)
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Content-type'] = 'application/jsonify'
+    response.headers['Content-type'] = 'application/json'
     return response
 
 
