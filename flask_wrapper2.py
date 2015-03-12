@@ -201,14 +201,10 @@ def f22(column1, column2):
     except:
         return api_repr(False)
 
-@app.route('/todo/api/v1.0/tasks', methods=['GET'])
-def get_tasks():
-    return jsonify({'tasks': 'todo'})
-
 
 @app.route('/')
 def root():
-  return app.send_static_file('/srv/www/CS261/index.html')
+    return app.send_static_file('/srv/www/CS261/index.html')
 
 
 def init():
@@ -272,7 +268,7 @@ if __name__ == '__main__':
     pp(system.interface.comms(None, 8))
 
     # Start wrapper
-    # app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')
 
     while True:
         signal.pause()

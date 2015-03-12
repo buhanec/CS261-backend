@@ -12,6 +12,7 @@ class FileInput(InputPlugin, Plugin):
 
     def __init__(self, source, unloader=None):
         super(FileInput, self).__init__(unloader=unloader)
+        self.unloader = unloader
         self.source = source
         self.logger.info('[FileInput] init')
 
@@ -25,6 +26,9 @@ class FileInput(InputPlugin, Plugin):
             pool.close()
             pool.join()
             pool = None
+        if self.unloader is not None:
+            self.unloader()
+
 
 
 class FileStore(StoragePlugin, Plugin):

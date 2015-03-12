@@ -8,6 +8,7 @@ from pprint import pprint as pp
 import time
 import threading
 import traceback
+from threading import Semaphore
 
 
 def str2dt(str_):
@@ -43,26 +44,20 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         price = st.Numeric(8, 2)
         email = st.String(254)
         date = st.DateTime(timezone=True)  # loses microseconds because mysql
-        symbol = st.CHAR(7)
+        symbol = st.CHAR(6)
         sector = st.String(255)
         volume = st.BigInteger()
         day = st.Integer()
         live = st.SmallInteger()
         firm = st.String(30)
         currency = st.Enum('GBX')
-        percent = st.Numeric(3, 2)
-        spread = st.Numeric(3, 2)
-        perf = st.Numeric(3, 2)
-        num_dev = st.Numeric(2, 2)
-        trade_id = st.BigInteger()
-        comm_id = st.BigInteger()
-        cluster_id = st.BigInteger()
+        pkey = st.BigInteger()
         alert_type = st.Enum('Volume', 'Price')
         # All the tables
         self.tables = {
             'trades': t(
                 'trades', metadata,
-                c('trade_id', trade_id, primary_key=True, autoincrement=True),
+                c('id', pkey, primary_key=True, autoincrement=True),
                 c('time', date),
                 c('buyer', email),
                 c('seller', email),
@@ -80,123 +75,55 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             ),
             'comms': t(
                 'comms', metadata,
+                c('id', pkey, primary_key=True, autoincrement=True),
                 c('time', date),
                 c('sender', email),
-                c('comm_id', comm_id, primary_key=True, autoincrement=True),
                 c('day', day, default=0),
                 c('live', live, default=0)
             ),
             'recipients': t(
                 'recipients', metadata,
-                c('comm_id', comm_id),
+                c('comm_id', pkey),
+                # c('comm_id', pkey, sa.ForeignKey('comms.id')),
                 c('recipient', email)
             ),
-            'avg_trades': t(
-                'avg_trades', metadata,
+            'stocks': t(
+                'stocks', metadata,
                 c('symbol', symbol, primary_key=True),
-                c('sector', sector),
-                c('currency', currency),
-                c('one_day_close', price),
-                c('five_day_close', price),
-                c('twenty_day_close', price),
-                c('one_day_price_mean', price),
-                c('one_day_price_sd', price),
-                c('five_day_price_mean', price),
-                c('five_day_price_sd', price),
-                c('twenty_day_price_mean', price),
-                c('twenty_day_price_sd', price),
-                c('one_day_volume_mean', price),
-                c('one_day_volume_sd', price),
-                c('five_day_volume_mean', price),
-                c('five_day_volume_sd', price),
-                c('twenty_day_volume_mean', price),
-                c('twenty_day_volume_sd', price),
-                c('one_day_spread_mean', spread),
-                c('one_day_spread_sd', spread),
-                c('five_day_spread_mean', spread),
-                c('five_day_spread_sd', spread),
-                c('twenty_day_spread_mean', spread),
-                c('twenty_day_spread_sd', spread),
-                c('one_day_stock_perf', perf),
-                c('one_day_sector_perf', perf),
-                c('five_day_stock_perf', perf),
-                c('five_day_sector_perf', perf),
-                c('twenty_day_stock_perf', perf),
-                c('twenty_day_sector_perf', perf),
-                c('one_day_price_input', num_dev),
-                c('five_day_price_input', num_dev),
-                c('twenty_day_price_input', num_dev),
-                c('one_day_spread_input', num_dev),
-                c('five_day_spread_input', num_dev),
-                c('twenty_day_spread_input', num_dev),
-                c('one_day_volume_input', num_dev),
-                c('five_day_volume_input', num_dev),
-                c('twenty_day_volume_input', num_dev),
-                c('one_day_perf_input', percent),
-                c('five_day_perf_input', percent),
-                c('twenty_day_perf_input', percent),
-                c('holdings_input', percent),
-            ),
-            'portfolio_holdings': t(
-                'portfolio_holdings', metadata,
-                c('firm', firm),
-                c('symbol', symbol),
-                c('holdings', volume),
-                c('holdings_perc', percent)
-            ),
-            'suspicious_trade': t(
-                'suspicious_trade', metadata,
-                c('off_market_trans_trade_id', trade_id),
-                c('wash_trade_trade_id', trade_id),
-                c('one_day_price_trade_id', trade_id),
-                c('five_day_price_trade_id', trade_id),
-                c('twenty_day_price_trade_id', trade_id),
-                c('one_day_spread_trade_id', trade_id),
-                c('five_day_spread_trade_id', trade_id),
-                c('twenty_day_spread_trade_id', trade_id),
-                c('one_day_volume_trade_id', trade_id),
-                c('five_day_volume_trade_id', trade_id),
-                c('twenty_day_volume_trade_id', trade_id),
-                c('one_day_perf_trade_id', trade_id),
-                c('five_day_perf_trade_id', trade_id),
-                c('twenty_day_perf_trade_id', trade_id),
-                c('portfolio_firm', firm),
-                c('portfolio_symbol', symbol),
-                c('trader_activity_trade_id', trade_id),
+                c('avg_price', st.Float()),
+                c('avg_size', st.Float()),
+                c('std_price', st.Float(), default=0),
+                c('std_size', st.Float(), default=0),
+                c('count', volume, default=1)
             ),
             'alerts': t(
                 'alerts', metadata,
-                c('trade_id', trade_id),
+                c('id', pkey, primary_key=True, autoincrement=True),
+                c('trade_id', pkey),
                 c('alert_type', alert_type),
-                c('trade_cluster', cluster_id),
-                c('comm_cluster', cluster_id),
+                c('comms', pkey),
+                c('trades', pkey)
+            ),
+            'comm_clusters': t(
+                'comm_clusters', metadata,
+                c('id', pkey),
+                c('trade_id', pkey)
+            ),
+            'trade_clusters': t(
+                'trade_clusters', metadata,
+                c('id', pkey),
+                c('cluster_id', pkey)
             )
         }
         # Create tables
         metadata.create_all(self.engine)
-        # Create views - format this with timer variable
-        session = self.Session()
-        try:
-            session.execute("CREATE OR REPLACE VIEW live_trades AS SELECT *\
-                            FROM trades WHERE live < 10")
-            session.execute("CREATE OR REPLACE VIEW past_trades AS SELECT *\
-                            FROM trades WHERE live >= 10 AND day < 20")
-            session.execute("CREATE OR REPLACE VIEW live_comms AS SELECT *\
-                            FROM comms WHERE live < 10")
-            session.execute("CREATE OR REPLACE VIEW past_comms AS SELECT *\
-                            FROM comms WHERE live >= 10 AND day < 20")
-            session.commit()
-        except:
-            session.rollback()
-            raise
-        self.tables['live_trades'] = t('live_trades', metadata, autoload=True)
-        self.tables['past_trades'] = t('past_trades', metadata, autoload=True)
-        self.tables['live_comms'] = t('live_comms', metadata, autoload=True)
-        self.tables['past_comms'] = t('past_comms', metadata, autoload=True)
         # Interval-based workers
         now = datetime.now()
         day = now.replace(hour=0, minute=10, second=0, microsecond=0)
         # "Minute" worker
+        self._min_count_sem = Semaphore(1)
+        self._min_count_m = 100
+        self._min_count = self._min_count_m
         self._min_interval_n = 1
         self._min_interval_m = 10
         self._min_interval = timedelta(minutes=self._min_interval_n)
@@ -213,7 +140,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         self._day_timer = threading.Timer(timeout, self.worker_day)
         self._day_timer.start()
         # expose session for QueryPlugin
-        self._session = session
+        self._session = self.Session()
         # Done with init
         self.status = Plugin.STATUS_INIT
         self.logger.info('[SqlStorage] init')
@@ -237,6 +164,24 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                     'buyer_firm': d[1].rsplit('@', 1)[1],
                     'seller_firm': d[2].rsplit('@', 1)[1]
                 } for d in data])
+                fixthis = '\
+SET @symbol = \''+d[6]+'\'; \
+SET @price = '+d[3]+'; \
+SET @size = '+d[4]+'; \
+INSERT INTO `stocks` (`symbol`, `avg_price`, `avg_size`, `count`) \
+VALUES (@symbol, @price, @size, 1) \
+ON DUPLICATE KEY UPDATE \
+`count` = `count` + 1, \
+`avg_price` = (SELECT AVG(`price`) FROM `trades` \
+               WHERE `symbol` = @symbol), \
+`std_price` = (SELECT STD(`price`) FROM `trades` \
+               WHERE `symbol` = @symbol), \
+`avg_size` = (SELECT AVG(`size`) FROM `trades` \
+              WHERE `symbol` = @symbol), \
+`std_size` = (SELECT STD(`size`) FROM `trades` \
+              WHERE `symbol` = @symbol); \
+                '
+                session.execute(fixthis)
                 # } for d in data if len(d) == 10])
             except ValueError:
                 self.logger.warn('[SqlStorage] Trade ValueError: %s', pf(data))
@@ -277,6 +222,16 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
                 self.store_comms(data, session)
             elif len(data[0]) == 10:
                 self.store_trades(data, session)
+        self._min_count_sem.acquire()
+        self._min_count = self._min_count - 1;
+        if self._min_count == 0:
+            try:
+                self._min_timer.cancel()
+                self._min_timer.join()
+            except:
+                pass
+            self.worker_minute()
+        self._min_count_sem.release()
 
     def worker(self):
         while not hasattr(self, "Session"):
@@ -301,11 +256,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         # Aliases for ease of use
         session = self.Session()
         comms = self.tables['comms']
-        live_comms = self.tables['live_comms']
-        past_comms = self.tables['past_comms']
         trades = self.tables['trades']
-        live_trades = self.tables['live_trades']
-        past_trades = self.tables['past_trades']
         # Increase live age
         try:
             c_up = comms.update().\
@@ -322,16 +273,10 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             traceback.print_exc()
         # Pre-algorithm updates
         try:
-            queries = [
-                # Preperations
-
-                # Algo
-
-            ]
-
+            queries = []
             for q in queries:
-                pass
                 #session.execute(q)
+                pass
             session.commit()
         except:
             session.rollback()
@@ -358,11 +303,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
         # Aliases for ease of use
         session = self.Session()
         comms = self.tables['comms']
-        live_comms = self.tables['live_comms']
-        past_comms = self.tables['past_comms']
         trades = self.tables['trades']
-        live_trades = self.tables['live_trades']
-        past_trades = self.tables['past_trades']
         # Increase day age
         try:
             c_up = comms.update().\
@@ -379,9 +320,7 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             traceback.print_exc()
         # Pre-algorithm updates
         try:
-            queries = [
-
-            ]
+            queries = []
             for q in queries:
                 session.execute(q)
             session.commit()
@@ -411,10 +350,16 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
 
     def unload(self):
         super(SqlStorage, self).unload()
-        self._min_timer.cancel()
-        self._day_timer.cancel()
-        self._min_timer.join()
-        self._day_timer.join()
+        try:
+            self._min_timer.cancel()
+            self._min_timer.join()
+        except:
+            pass
+        try:
+            self._day_timer.cancel()
+            self._day_timer.join()
+        except:
+            pass
         self.Session.remove()
         self.logger.info("[SqlStorage] unload")
 
@@ -448,7 +393,8 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
             query = self._session.query(comms).order_by(comms.c.time.desc())\
                         .limit(number)
             self._session.commit()
-            l =  [list(r)[:-2] for r in self._session.execute(query)]
+            l = [list(r)[:-3] + [self.recipients(list(r)[-3])]
+                 for r in self._session.execute(query)]
             return l
         except:
             self._session.rollback()
@@ -474,5 +420,5 @@ class SqlStorage(StoragePlugin, QueryPlugin, Plugin):
     def alert(self, alertid):
         pass
 
-    def plost_data(self, column1, column2):
+    def plot_data(self, column1, column2):
         pass
