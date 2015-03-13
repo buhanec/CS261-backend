@@ -12,6 +12,7 @@ sys.modules["decimal"] = cdecimal
 
 app = Flask(__name__)
 system = TheSystem()
+sql_id = 2
 
 
 def jstr(l):
@@ -174,7 +175,20 @@ def f21(alertid):
         return api_repr(False)
 
 
+@app.route("/file/<string:name>", methods=['GET'])
+def f22(name):
+    global sql_id
+    try:
+        path = "/srv/www/files/"+name
+        pluginid = system.load_plugin('FileReader', None, 'FileReader', path)
+        system.connect_plugins(pluginid, sql_id)
+        return api_repr(pluginid)
+    except:
+        return api_repr(False)
+
+
 def init():
+    global sql_id
     # Params for data collection
     trades = ('cs261.dcs.warwick.ac.uk', 80)
     comms = ('cs261.dcs.warwick.ac.uk', 1720)
@@ -232,9 +246,7 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, handler)
 
     # flask
-    app.run(debug=True, host='0.0.0.0')
-
-    subprocess.Popen(['pip', 'freeze'], stdout=open('/tmp/pip.log', 'w'))
+    app.run(debug=False, host='0.0.0.0')
 
     while True:
         signal.pause()
