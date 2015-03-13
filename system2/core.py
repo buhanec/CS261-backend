@@ -89,8 +89,7 @@ class TheSystem(object):
             instance = plugin(*(args,),
                               unloader=(lambda: self.unload(plugin_id)))
         except:
-            raise
-            #raise PluginInitError(plugin)
+            raise PluginInitError(plugin)
         self._plugins[plugin_id] = (name, desc, instance)
         if 'input' in plugin.type:
             self._threads['input'][plugin_id] = {}
@@ -117,7 +116,7 @@ class TheSystem(object):
             self._plugins[id_][2].unload()
             del self._plugins[id_]
         else:
-            raise Exception("plugin does not exist")
+            raise MissingPlugin(id_)
 
     def unload_all(self):
         for id_ in self._plugins.keys():

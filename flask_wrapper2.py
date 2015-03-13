@@ -1,19 +1,14 @@
 import sys
 import cdecimal
-sys.modules["decimal"] = cdecimal
 import decimal
 import datetime
 from system2 import TheSystem
-import time
 import traceback
-from flask import Flask, request, url_for, Response, make_response
-from flask import request, render_template, current_app
-from flask.ext.api import FlaskAPI, status, exceptions
+from flask import Flask, request, make_response
 import signal
 import json
-import sys
-from pprint import pprint as pp
 import subprocess
+sys.modules["decimal"] = cdecimal
 
 app = Flask(__name__)
 system = TheSystem()
@@ -21,7 +16,7 @@ system = TheSystem()
 
 def jstr(l):
     for k, v in enumerate(l):
-        if isinstance(v, decimal.Decimal):
+        if isinstance(v, decimal.Decimal) or isinstance(v, cdecimal.Decimal):
             l[k] = str(v)
         elif isinstance(v, datetime.datetime):
             l[k] = v.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]+'Z'
@@ -130,7 +125,7 @@ def f13(number):
 
 
 @app.route("/data/trade/<int:number>", methods=['GET'])
-def f13(number):
+def f13_(number):
     try:
         return api_repr(system.interface.trade(number))
     except:
@@ -151,6 +146,7 @@ def f17(number):
     try:
         return api_repr(system.interface.alerts(None, number))
     except:
+        raise
         return api_repr(False)
 
 
@@ -235,12 +231,8 @@ if __name__ == '__main__':
     # handler
     signal.signal(signal.SIGINT, handler)
 
-    # Tests
-    # pp(system.interface.comms(None, 3))
-    # time.sleep(1)
-    pp(system.interface.trade(3))
-    # Start wrapper
-    # app.run(debug=True, host='0.0.0.0')
+    # flask
+    app.run(debug=True, host='0.0.0.0')
 
     subprocess.Popen(['pip', 'freeze'], stdout=open('/tmp/pip.log', 'w'))
 

@@ -27,7 +27,7 @@ class SocketServer(object):
                 while not self.terminate:
                     data = conn.recv(self.buff)
                     if data:
-                        conn.sendall(data)  # just echo back for now
+                        conn.sendall(data)
                     else:
                         break
             finally:

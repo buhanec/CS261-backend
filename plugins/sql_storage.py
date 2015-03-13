@@ -3,8 +3,6 @@ import sqlalchemy as sa
 from sqlalchemy.orm import scoped_session, sessionmaker
 import sqlalchemy.types as st
 from datetime import datetime, timedelta
-from pprint import pformat as pf
-from pprint import pprint as pp
 import time
 import threading
 import traceback
@@ -199,9 +197,10 @@ ON DUPLICATE KEY UPDATE \
                 if r[5] > 10:
                     dprice = abs(price - r[1])/r[3]
                     dvolume = abs(size - r[2])/r[4]
-                    if dprice > 2:
+                    threshold = 3
+                    if dprice > threshold:
                         session.execute('INSERT INTO `alerts` (`trade_id`, `severity`, `alert_type`, `comms`, `trades`) VALUES ('+str(tradeid)+', '+str(dprice)+', \'Price\', null, null)')
-                    if dvolume > 2:
+                    if dvolume > threshold:
                         session.execute('INSERT INTO `alerts` (`trade_id`, `severity`, `alert_type`, `comms`, `trades`) VALUES ('+str(tradeid)+', '+str(dvolume)+', \'Volume\', null, null)')
         except:
             raise
@@ -298,8 +297,7 @@ ON DUPLICATE KEY UPDATE \
         try:
             queries = []
             for q in queries:
-                #session.execute(q)
-                pass
+                session.execute(q)
             session.commit()
         except:
             session.rollback()
@@ -430,10 +428,11 @@ ON DUPLICATE KEY UPDATE \
     def alerts(self, query, number):
         try:
             alerts = self.tables['alerts']
-            query = self._session.query(alerts).order_by(alerts.c.time.desc())\
+            query = self._session.query(alerts).order_by(alerts.c.id.desc())\
                         .limit(number)
             self._session.commit()
-            return [list(r)[-2] for r in self._session.execute(query)]
+            # return [list(r)[-2] for r in self._session.execute(query)]
+            return [list(r) for r in self._session.execute(query)]
         except:
             self._session.rollback()
             raise
@@ -445,7 +444,4 @@ ON DUPLICATE KEY UPDATE \
         pass
 
     def alert(self, alertid):
-        pass
-
-    def plot_data(self, column1, column2):
         pass

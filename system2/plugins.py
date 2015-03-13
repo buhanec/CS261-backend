@@ -1,7 +1,6 @@
 import threading
 import logging
 from Queue import Queue
-from multiprocessing import cpu_count
 
 logger = logging.getLogger('demosystem')
 
@@ -201,7 +200,6 @@ class StoragePlugin(object):
         if self.unloader is not None:
             logger.info("[StoragePlugin] calling external unloader")
             self.unloader()
-
 
 
 class QueryPlugin(object):
